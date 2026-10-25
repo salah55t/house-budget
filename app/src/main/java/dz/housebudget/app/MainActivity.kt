@@ -9,11 +9,12 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dz.housebudget.app.ui.AddExpenseFragment
 import dz.housebudget.app.ui.ExpensesFragment
 import dz.housebudget.app.ui.HomeFragment
+import dz.housebudget.app.ui.MessagesFragment
 import dz.housebudget.app.ui.ReportsFragment
 import dz.housebudget.app.ui.SettingsFragment
 
 /**
- * النشاط الرئيسي: شريط تنقل سفلي بأربع شاشات + زر عائم لإضافة مصروف سريع.
+ * النشاط الرئيسي: شريط تنقل سفلي بخمس شاشات + زر عائم لإضافة مصروف سريع.
  * جميع الشاشات عبارة عن Fragments تُستبدل داخل حاوية واحدة (نمط Single-Activity).
  */
 class MainActivity : AppCompatActivity() {
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_home -> { showFragment(HomeFragment()); true }
                 R.id.nav_expenses -> { showFragment(ExpensesFragment()); true }
                 R.id.nav_reports -> { showFragment(ReportsFragment()); true }
+                R.id.nav_messages -> { showFragment(MessagesFragment()); true }
                 R.id.nav_settings -> { showFragment(SettingsFragment()); true }
                 else -> false
             }

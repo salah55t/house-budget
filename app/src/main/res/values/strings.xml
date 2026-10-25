@@ -91,4 +91,37 @@
     <string name="sync_help">اكتب نفس الرابط ونفس الرمز في هذا الهاتف وعلى الهاتف الثاني، وستتبادلان المصاريف والميزانية تلقائياً. أول هاتف يولّد الرمز يشاركه مع الآخر.</string>
     <string name="connection_ok">الاتصال بالسيرفر يعمل بنجاح</string>
     <string name="app_version">إصدار التطبيق 1.0 — حصالة البيت</string>
+
+    <!-- شاشة المراسلات: طلبات الشراء + الرسائل النصية -->
+    <string name="nav_messages">المراسلات</string>
+    <string name="tab_requests">طلبات الشراء</string>
+    <string name="tab_texts">الرسائل النصية</string>
+    <string name="requests_header">قائمة انتظار الشراء — حدّد الطلب لإدخال ثمنه وخصمه من الميزانية</string>
+    <string name="requests_count">%1$d طلب قيد الانتظار من أصل %2$d</string>
+    <string name="fab_new_request">طلب شراء جديد</string>
+    <string name="hint_request_name">اسم المنتج المطلوب</string>
+    <string name="hint_request_price">سعر مقترح (اختياري)</string>
+    <string name="dialog_request_helper">سيصل الطلب إلى الهاتف الآخر في قائمة انتظار الشراء، وعند تحديده تظهر خانة الثمن وبعد تأكيده يُخصم من الميزانية تلقائياً.</string>
+    <string name="err_request_name">اكتب اسم المنتج المطلوب</string>
+    <string name="request_sent">تم إرسال الطلب إلى الهاتف الآخر</string>
+    <string name="status_pending">قيد الانتظار</string>
+    <string name="status_purchased">تم الشراء</string>
+    <string name="status_rejected">مرفوض</string>
+    <string name="from_me">منك</string>
+    <string name="from_other">من الهاتف الآخر</string>
+    <string name="suggested_price">سعر مقترح: %1$s</string>
+    <string name="purchased_price">تم شراؤه بمبلغ %1$s وأُضيف إلى المصاريف</string>
+    <string name="hint_actual_price">الثمن الفعلي (يُخصم من الميزانية)</string>
+    <string name="btn_confirm_purchase">تأكيد الشراء</string>
+    <string name="btn_reject_request">رفض الطلب</string>
+    <string name="err_price">أدخل ثمناً صحيحاً أكبر من صفر</string>
+    <string name="purchase_done">تم خصم الثمن من الميزانية وإضافته إلى المصاريف</string>
+    <string name="reject_done">تم رفض الطلب</string>
+    <string name="empty_requests">لا طلبات شراء بعد</string>
+    <string name="empty_requests_desc">أرسل طلب شراء من الزر الأخضر ليصل إلى الهاتف الآخر، أو انتظر طلباً وارداً من الآخر.</string>
+    <string name="empty_texts">لا رسائل بعد</string>
+    <string name="empty_texts_desc">أرسل أول رسالة نصية إلى الهاتف الآخر.</string>
+    <string name="hint_message">اكتب رسالة…</string>
+    <string name="send">إرسال</string>
+    <string name="sync_failed_short">تعذرت المزامنة — سيُعاد الإرسال تلقائياً كل دقيقة</string>
 </resources>

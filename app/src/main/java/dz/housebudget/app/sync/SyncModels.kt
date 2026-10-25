@@ -27,6 +27,21 @@ data class TemplateDto(
     val deleted: Boolean = false
 )
 
+/** نسخة المراسلة (طلب شراء أو رسالة نصية) القابلة للنقل عبر الشبكة */
+data class MessageDto(
+    val id: String,
+    val type: String,
+    val text: String,
+    val suggestedPrice: Double = 0.0,
+    val status: String = "PENDING",
+    val purchasedPrice: Double = 0.0,
+    val expenseId: String = "",
+    val senderId: String = "",
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deleted: Boolean = false
+)
+
 /** الحقول المشتركة من الإعدادات (بدون الرابط ورمز الربط المحليين) */
 data class SettingsDto(
     val totalBudget: Double,
@@ -41,6 +56,7 @@ data class SettingsDto(
 data class SyncRequest(
     val expenses: List<ExpenseDto>,
     val templates: List<TemplateDto> = emptyList(),
+    val messages: List<MessageDto> = emptyList(),
     val settings: SettingsDto? = null
 )
 
@@ -49,6 +65,7 @@ data class SyncResponse(
     val ok: Boolean,
     val expenses: List<ExpenseDto> = emptyList(),
     val templates: List<TemplateDto> = emptyList(),
+    val messages: List<MessageDto> = emptyList(),
     val settings: SettingsDto? = null,
     val serverTime: Long = 0,
     val error: String? = null

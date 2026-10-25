@@ -3,9 +3,9 @@
  *  سيرفر مزامنة "حصالة البيت" (House Budget Sync)
  * ============================================
  * وسيط خفيف بين هاتفين يشاركان نفس رمز الربط:
- *  - الهاتف الأول يرفع مصاريفه وقوالبه وتحديثات الميزانية عبر POST /api/:code/sync
+ *  - الهاتف الأول يرفع مصاريفه وقوالبه ومراسلاته وتحديثات الميزانية عبر POST /api/:code/sync
  *  - الهاتف الثاني يسحب الحالة الموحدة عبر نفس الطلب أو GET /api/:code/state
- *  - الدمج بقاعدة "الأحدث يفوز" حسب حقل updatedAt لكل سجل (مصاريف + قوالب + إعدادات)
+ *  - الدمج بقاعدة "الأحدث يفوز" حسب حقل updatedAt لكل سجل (مصاريف + قوالب + مراسلات + إعدادات)
  *
  * التخزين: ملف JSON خفيف (بدون أي قواعد بيانات خارجية) —
  * مثالي كوسيط مؤقت على خطة Render المجانية.
@@ -23,6 +23,7 @@ const DATA_FILE = path.join(DATA_DIR, 'sync-store.json');
 // حد أقصى للحماية من نمو غير طبيعي (يكفي لمصاريف بيت لسنوات)
 const MAX_EXPENSES_PER_HOUSE = 5000;
 const MAX_TEMPLATES_PER_HOUSE = 200;
+const MAX_MESSAGES_PER_HOUSE = 500;
 
 // رمز الربط: حروف إنجليزية وأرقام فقط، 4 إلى 32 محرفاً
 const CODE_RE = /^[A-Za-z0-9]{4,32}$/;
@@ -51,10 +52,12 @@ function persist() {
 }
 
 function getHouse(code) {
-  if (!store[code]) store[code] = { expenses: {}, templates: {}, settings: null };
+  if (!store[code]) store[code] = { expenses: {}, templates: {}, messages: {}, settings: null };
   if (!store[code].expenses) store[code].expenses = {};
   // توافق خلفي: بيوت أُنشئت قبل إضافة القوالب
   if (!store[code].templates) store[code].templates = {};
+  // توافق خلفي: بيوت أُنشئت قبل إضافة المراسلات (طلبات الشراء + الرسائل النصية)
+  if (!store[code].messages) store[code].messages = {};
   return store[code];
 }
 
@@ -125,6 +128,7 @@ app.get('/api/:code/state', (req, res) => {
     ok: true,
     expenses: Object.values(house.expenses),
     templates: Object.values(house.templates),
+    messages: Object.values(house.messages),
     settings: house.settings,
     serverTime: Date.now()
   });
@@ -178,6 +182,31 @@ app.post('/api/:code/sync', (req, res) => {
     }
   }
 
+  // دمج المراسلات (طلبات الشراء + الرسائل النصية): نفس قاعدة الأحدث يفوز
+  // حالة الطلب (PENDING/PURCHASED/REJECTED) تُدمج كسجل واحد كامل
+  const incomingMessages = Array.isArray(body.messages) ? body.messages : [];
+  const VALID_STATUSES = ['PENDING', 'PURCHASED', 'REJECTED'];
+  for (const raw of incomingMessages) {
+    if (!raw || typeof raw.id !== 'string') continue;
+    const clean = {
+      id: raw.id.slice(0, 64),
+      type: raw.type === 'REQUEST' ? 'REQUEST' : 'TEXT',
+      text: String(raw.text || '').slice(0, 500),
+      suggestedPrice: Number(raw.suggestedPrice) || 0,
+      status: VALID_STATUSES.includes(raw.status) ? raw.status : 'PENDING',
+      purchasedPrice: Number(raw.purchasedPrice) || 0,
+      expenseId: String(raw.expenseId || '').slice(0, 64),
+      senderId: String(raw.senderId || '').slice(0, 64),
+      createdAt: Number(raw.createdAt) || 0,
+      updatedAt: Number(raw.updatedAt) || 0,
+      deleted: Boolean(raw.deleted)
+    };
+    const existing = house.messages[clean.id];
+    if (!existing || clean.updatedAt >= existing.updatedAt) {
+      house.messages[clean.id] = clean;
+    }
+  }
+
   // حد أقصى للحماية: عند التجاوز نحتفظ بالسجلات الأحدث تحديثاً
   const ids = Object.keys(house.expenses);
   if (ids.length > MAX_EXPENSES_PER_HOUSE) {
@@ -192,6 +221,14 @@ app.post('/api/:code/sync', (req, res) => {
     tids.sort((a, b) => (house.templates[a].updatedAt || 0) - (house.templates[b].updatedAt || 0));
     const toRemoveT = tids.length - MAX_TEMPLATES_PER_HOUSE;
     for (let i = 0; i < toRemoveT; i++) delete house.templates[tids[i]];
+  }
+
+  // حد أقصى للمراسلات: نحافظ على الأحدث (طلبات وحالة أحدث أولاً)
+  const mids = Object.keys(house.messages);
+  if (mids.length > MAX_MESSAGES_PER_HOUSE) {
+    mids.sort((a, b) => (house.messages[a].updatedAt || 0) - (house.messages[b].updatedAt || 0));
+    const toRemoveM = mids.length - MAX_MESSAGES_PER_HOUSE;
+    for (let i = 0; i < toRemoveM; i++) delete house.messages[mids[i]];
   }
 
   // دمج الإعدادات المشتركة: الأحدث زمنياً يفوز
@@ -215,6 +252,7 @@ app.post('/api/:code/sync', (req, res) => {
     ok: true,
     expenses: Object.values(house.expenses),
     templates: Object.values(house.templates),
+    messages: Object.values(house.messages),
     settings: house.settings,
     serverTime: Date.now()
   });

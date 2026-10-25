@@ -3,10 +3,15 @@ package dz.housebudget.app.repo
 import android.content.Context
 import dz.housebudget.app.data.AppDatabase
 import dz.housebudget.app.data.AppSettings
+import dz.housebudget.app.data.Categories
 import dz.housebudget.app.data.Expense
+import dz.housebudget.app.data.HouseMessage
+import dz.housebudget.app.data.MessageStatus
+import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.data.QuickTemplate
 import dz.housebudget.app.sync.ApiClient
 import dz.housebudget.app.sync.ExpenseDto
+import dz.housebudget.app.sync.MessageDto
 import dz.housebudget.app.sync.SettingsDto
 import dz.housebudget.app.sync.SyncRequest
 import dz.housebudget.app.sync.SyncResponse
@@ -25,12 +30,30 @@ object BudgetRepository {
 
     private lateinit var db: AppDatabase
 
+    // معرف هذا الجهاز: يميّز المراسلات المرسلة من هذا الهاتف عن الواردة من الآخر
+    private var deviceId: String = ""
+
     // يجب استدعاؤه مرة واحدة من Application.onCreate قبل أي استخدام
     fun init(context: Context) {
         if (!::db.isInitialized) {
             db = AppDatabase.get(context)
+            deviceId = loadOrCreateDeviceId(context.applicationContext)
         }
     }
+
+    /** تحميل معرف الجهاز من التخزين المحلي أو توليد معرف جديد دائم عند أول تشغيل */
+    private fun loadOrCreateDeviceId(context: Context): String {
+        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val saved = prefs.getString("device_id", null)
+        return if (!saved.isNullOrBlank()) saved else {
+            val fresh = UUID.randomUUID().toString()
+            prefs.edit().putString("device_id", fresh).apply()
+            fresh
+        }
+    }
+
+    /** معرف هذا الجهاز لتمييز اتجاه المراسلة (مني / من الهاتف الآخر) */
+    fun myDeviceId(): String = deviceId
 
     // ---------- التدفقات الحية (تحدّث الواجهة تلقائياً عند أي تغيير) ----------
     // ملاحظة: نستخدم خصائص get() وليس قيماً مخزنة، حتى تُبنى بعد تهيئة db
@@ -43,6 +66,9 @@ object BudgetRepository {
 
     val templatesFlow: Flow<List<QuickTemplate>>
         get() = db.templateDao().observeAll()
+
+    val messagesFlow: Flow<List<HouseMessage>>
+        get() = db.messageDao().observeAll()
 
     fun recentExpensesFlow(limit: Int): Flow<List<Expense>> =
         db.expenseDao().observeRecent(limit)
@@ -68,10 +94,32 @@ object BudgetRepository {
         db.expenseDao().upsert(expense.copy(deleted = true, updatedAt = System.currentTimeMillis()))
     }
 
-    /** تعديل الإعدادات المشتركة مع تحديث الطابع الزمني (لحسم الأقدمية عند المزامنة) */
+    /** هل تغيّر حقل "متزامن" فعلاً بين نسختين من الإعدادات؟ (الميزانية/الدورة/الادخار فقط) */
+    private fun syncableChanged(before: AppSettings, after: AppSettings): Boolean =
+        before.totalBudget != after.totalBudget ||
+            before.periodType != after.periodType ||
+            before.startDay != after.startDay ||
+            before.savingGoal != after.savingGoal ||
+            before.savingModeEnabled != after.savingModeEnabled
+
+    /**
+     * تعديل الإعدادات مع ختم زمني ذكي: يُختم الوقت فقط إذا تغيّر حقل متزامن فعلاً.
+     *
+     * هذا إصلاح خلل جوهري: حفظ الحقول المحلية (رابط السيرفر ورمز الربط)
+     * كان يجدد الطابع الزمني، فيصبح هاتف انضم حديثاً "الأحدث" بإعداداته
+     * الفارغة (ميزانية 0، يوم راتب 1) ويطغى على السيرفر عند المزامنة،
+     * فتمسح ميزانية ودورة الهاتف الآخر — وهذا ما كان يفعله المستخدم
+     * بضغطة "مزامنة الآن" أو "فحص الاتصال" على الهاتف الثاني.
+     */
     suspend fun updateSettings(transform: (AppSettings) -> AppSettings) {
         val current = db.settingsDao().get() ?: AppSettings()
-        db.settingsDao().upsert(transform(current).copy(id = 1, updatedAt = System.currentTimeMillis()))
+        val updated = transform(current).copy(id = 1)
+        val stamped = if (syncableChanged(current, updated)) {
+            updated.copy(updatedAt = System.currentTimeMillis())
+        } else {
+            updated
+        }
+        db.settingsDao().upsert(stamped)
     }
 
     /** حفظ عملية كقالب سريع جديد (قابل للمزامنة: طابع زمني لتحديد الأقدمية) */
@@ -92,6 +140,82 @@ object BudgetRepository {
     suspend fun deleteTemplate(template: QuickTemplate) {
         db.templateDao().upsert(
             template.copy(deleted = true, updatedAt = System.currentTimeMillis())
+        )
+    }
+
+    // ---------- المراسلات: طلبات الشراء والرسائل النصية ----------
+
+    /** إرسال رسالة نصية عادية إلى الهاتف الآخر */
+    suspend fun sendTextMessage(text: String, now: Long = System.currentTimeMillis()) {
+        db.messageDao().upsert(
+            HouseMessage(
+                type = MessageTypes.TEXT,
+                text = text.trim(),
+                senderId = deviceId,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+    }
+
+    /** إرسال طلب شراء إلى الهاتف الآخر (يظهر لديه في قائمة انتظار الشراء) */
+    suspend fun sendPurchaseRequest(
+        name: String,
+        suggestedPrice: Double,
+        now: Long = System.currentTimeMillis()
+    ) {
+        db.messageDao().upsert(
+            HouseMessage(
+                type = MessageTypes.REQUEST,
+                text = name.trim(),
+                suggestedPrice = suggestedPrice,
+                senderId = deviceId,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+    }
+
+    /**
+     * تأكيد شراء طلب من قائمة الانتظار:
+     * يُنشأ مصروف بالثمن الفعلي فيُخصم تلقائياً من الميزانية (المتبقي مشتق)،
+     * وتتغير حالة الطلب إلى "تم الشراء" فتنتقل للهاتف الآخر عند المزامنة.
+     */
+    suspend fun purchaseRequest(
+        message: HouseMessage,
+        price: Double,
+        category: String = Categories.OTHER
+    ) {
+        val now = System.currentTimeMillis()
+        val expenseId = UUID.randomUUID().toString()
+        db.expenseDao().upsert(
+            Expense(
+                id = expenseId,
+                name = message.text.ifBlank { "طلب شراء" },
+                amount = price,
+                category = category,
+                createdAt = now,
+                updatedAt = now,
+                deleted = false
+            )
+        )
+        db.messageDao().upsert(
+            message.copy(
+                status = MessageStatus.PURCHASED,
+                purchasedPrice = price,
+                expenseId = expenseId,
+                updatedAt = now
+            )
+        )
+    }
+
+    /** رفض طلب شراء: تبقى حالته معلّمة "مرفوض" وتنتقل للهاتف الآخر عند المزامنة */
+    suspend fun rejectRequest(message: HouseMessage) {
+        db.messageDao().upsert(
+            message.copy(
+                status = MessageStatus.REJECTED,
+                updatedAt = System.currentTimeMillis()
+            )
         )
     }
 
@@ -125,6 +249,7 @@ object BudgetRepository {
 
             val localExpenses = db.expenseDao().getAllIncludingDeleted()
             val localTemplates = db.templateDao().getAllIncludingDeleted()
+            val localMessages = db.messageDao().getAllIncludingDeleted()
             val localSettings = SettingsDto(
                 totalBudget = settings.totalBudget,
                 periodType = settings.periodType,
@@ -139,6 +264,7 @@ object BudgetRepository {
                 SyncRequest(
                     expenses = localExpenses.map { it.toDto() },
                     templates = localTemplates.map { it.toDto() },
+                    messages = localMessages.map { it.toDto() },
                     settings = localSettings
                 )
             )
@@ -178,21 +304,34 @@ object BudgetRepository {
             db.templateDao().upsertAll(response.templates.map { it.toEntity() })
         }
 
+        // دمج المراسلات: طلبات الشراء (بحالاتها) + الرسائل النصية
+        if (response.messages.isNotEmpty()) {
+            db.messageDao().upsertAll(response.messages.map { it.toEntity() })
+        }
+
         // تحديث الإعدادات المشتركة فقط دون المساس بالحقول المحلية (الرابط ورمز الربط)
         val serverSettings = response.settings
         if (serverSettings != null) {
             val local = settingsSnapshot()
             if (serverSettings.updatedAt >= local.updatedAt) {
-                db.settingsDao().upsert(
-                    local.copy(
-                        totalBudget = serverSettings.totalBudget,
-                        periodType = serverSettings.periodType,
-                        startDay = serverSettings.startDay,
-                        savingGoal = serverSettings.savingGoal,
-                        savingModeEnabled = serverSettings.savingModeEnabled,
-                        updatedAt = serverSettings.updatedAt
+                if (serverSettings.totalBudget == 0.0 && local.totalBudget > 0.0) {
+                    // حماية ذاتية: الميزانية الصفرية ليست اختياراً حقيقياً
+                    // (الواجهة تمنع حفظ صفر) بل أثر الطغيان القديم — نرفض تطبيقها
+                    // ونختم وقتنا المحلي ليفوز في المزامنة القادمة ويعيد الميزانية
+                    // الصحيحة والدورة إلى الهاتف الآخر خلال دقيقة كحد أقصى
+                    db.settingsDao().upsert(local.copy(updatedAt = System.currentTimeMillis()))
+                } else {
+                    db.settingsDao().upsert(
+                        local.copy(
+                            totalBudget = serverSettings.totalBudget,
+                            periodType = serverSettings.periodType,
+                            startDay = serverSettings.startDay,
+                            savingGoal = serverSettings.savingGoal,
+                            savingModeEnabled = serverSettings.savingModeEnabled,
+                            updatedAt = serverSettings.updatedAt
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -204,4 +343,14 @@ object BudgetRepository {
         TemplateDto(id, name, amount, category, sortOrder, updatedAt, deleted)
     private fun TemplateDto.toEntity() =
         QuickTemplate(id, name, amount, category, sortOrder, updatedAt, deleted)
+    private fun HouseMessage.toDto() =
+        MessageDto(
+            id, type, text, suggestedPrice, status,
+            purchasedPrice, expenseId, senderId, createdAt, updatedAt, deleted
+        )
+    private fun MessageDto.toEntity() =
+        HouseMessage(
+            id, type, text, suggestedPrice, status,
+            purchasedPrice, expenseId, senderId, createdAt, updatedAt, deleted
+        )
 }

@@ -12,11 +12,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * تخزين داخلي كامل بدون صلاحيات تخزين خارجي — متوافق 100% مع أندرويد 10 وما فوق.
  *
  * النسخة 2: القوالب السريعة أصبحت قابلة للمزامنة (معرّف UUID + طابع زمني + حذف ناعم)
- * مع هجرة تحفظ القوالب القديمة كما هي.
+ * النسخة 3: جدول المراسلات (طلبات الشراء + الرسائل النصية) بين الهاتفين
  */
 @Database(
-    entities = [Expense::class, QuickTemplate::class, AppSettings::class],
-    version = 2,
+    entities = [Expense::class, QuickTemplate::class, AppSettings::class, HouseMessage::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun templateDao(): TemplateDao
     abstract fun settingsDao(): SettingsDao
+    abstract fun messageDao(): MessageDao
 
     companion object {
 
@@ -58,6 +59,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * هجرة 2 → 3: إنشاء جدول المراسلات (طلبات الشراء + الرسائل النصية).
+         * جدول جديد بالكامل فلا حاجة لنقل بيانات قديمة.
+         */
+        private val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS messages (" +
+                        "id TEXT NOT NULL PRIMARY KEY, " +
+                        "type TEXT NOT NULL, " +
+                        "text TEXT NOT NULL, " +
+                        "suggestedPrice REAL NOT NULL, " +
+                        "status TEXT NOT NULL, " +
+                        "purchasedPrice REAL NOT NULL, " +
+                        "expenseId TEXT NOT NULL, " +
+                        "senderId TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL, " +
+                        "deleted INTEGER NOT NULL)"
+                )
+            }
+        }
+
         // نمط Singleton الآمن للخيوط: نسخة واحدة من القاعدة في كل التطبيق
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
@@ -66,7 +90,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "house_budget.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }

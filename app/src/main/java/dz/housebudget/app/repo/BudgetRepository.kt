@@ -10,6 +10,7 @@ import dz.housebudget.app.sync.ExpenseDto
 import dz.housebudget.app.sync.SettingsDto
 import dz.housebudget.app.sync.SyncRequest
 import dz.housebudget.app.sync.SyncResponse
+import dz.housebudget.app.sync.TemplateDto
 import dz.housebudget.app.util.BudgetLogic
 import dz.housebudget.app.util.PeriodInfo
 import kotlinx.coroutines.flow.Flow
@@ -73,17 +74,25 @@ object BudgetRepository {
         db.settingsDao().upsert(transform(current).copy(id = 1, updatedAt = System.currentTimeMillis()))
     }
 
-    /** حفظ عملية كقالب سريع جديد */
+    /** حفظ عملية كقالب سريع جديد (قابل للمزامنة: طابع زمني لتحديد الأقدمية) */
     suspend fun saveAsTemplate(name: String, amount: Double, category: String) {
         val count = db.templateDao().count()
         db.templateDao().upsert(
-            QuickTemplate(name = name, amount = amount, category = category, sortOrder = count)
+            QuickTemplate(
+                name = name,
+                amount = amount,
+                category = category,
+                sortOrder = count,
+                updatedAt = System.currentTimeMillis()
+            )
         )
     }
 
-    /** حذف قالب سريع */
+    /** حذف قالب سريع (حذف ناعم: ينتقل للهاتف الآخر عند المزامنة) */
     suspend fun deleteTemplate(template: QuickTemplate) {
-        db.templateDao().deleteById(template.id)
+        db.templateDao().upsert(
+            template.copy(deleted = true, updatedAt = System.currentTimeMillis())
+        )
     }
 
     /** لقطة سريعة من الإعدادات الحالية */
@@ -115,6 +124,7 @@ object BudgetRepository {
             val api = ApiClient.build(settings.serverUrl)
 
             val localExpenses = db.expenseDao().getAllIncludingDeleted()
+            val localTemplates = db.templateDao().getAllIncludingDeleted()
             val localSettings = SettingsDto(
                 totalBudget = settings.totalBudget,
                 periodType = settings.periodType,
@@ -124,7 +134,14 @@ object BudgetRepository {
                 updatedAt = settings.updatedAt
             )
 
-            val response = api.sync(settings.houseCode.trim(), SyncRequest(localExpenses.map { it.toDto() }, localSettings))
+            val response = api.sync(
+                settings.houseCode.trim(),
+                SyncRequest(
+                    expenses = localExpenses.map { it.toDto() },
+                    templates = localTemplates.map { it.toDto() },
+                    settings = localSettings
+                )
+            )
             if (!response.ok) {
                 return SyncResult.Error(response.error ?: "خطأ غير معروف من السيرفر")
             }
@@ -156,6 +173,11 @@ object BudgetRepository {
         // دمج سجلات المصاريف (السيرفر دمجها مسبقاً: الأحدث يفوز)
         db.expenseDao().upsertAll(response.expenses.map { it.toEntity() })
 
+        // دمج القوالب السريعة (بما فيها علامات الحذف الناعم)
+        if (response.templates.isNotEmpty()) {
+            db.templateDao().upsertAll(response.templates.map { it.toEntity() })
+        }
+
         // تحديث الإعدادات المشتركة فقط دون المساس بالحقول المحلية (الرابط ورمز الربط)
         val serverSettings = response.settings
         if (serverSettings != null) {
@@ -178,4 +200,8 @@ object BudgetRepository {
     // محولات بين كيانات Room ونماذج الشبكة
     private fun Expense.toDto() = ExpenseDto(id, name, amount, category, createdAt, updatedAt, deleted)
     private fun ExpenseDto.toEntity() = Expense(id, name, amount, category, createdAt, updatedAt, deleted)
+    private fun QuickTemplate.toDto() =
+        TemplateDto(id, name, amount, category, sortOrder, updatedAt, deleted)
+    private fun TemplateDto.toEntity() =
+        QuickTemplate(id, name, amount, category, sortOrder, updatedAt, deleted)
 }

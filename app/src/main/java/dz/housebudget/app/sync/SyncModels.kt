@@ -16,6 +16,17 @@ data class ExpenseDto(
     val deleted: Boolean
 )
 
+/** نسخة القالب السريع القابلة للنقل عبر الشبكة */
+data class TemplateDto(
+    val id: String,
+    val name: String,
+    val amount: Double,
+    val category: String,
+    val sortOrder: Int = 0,
+    val updatedAt: Long = 0,
+    val deleted: Boolean = false
+)
+
 /** الحقول المشتركة من الإعدادات (بدون الرابط ورمز الربط المحليين) */
 data class SettingsDto(
     val totalBudget: Double,
@@ -29,13 +40,15 @@ data class SettingsDto(
 /** طلب المزامنة: نرفع كل بياناتنا المحلية ليندمجها السيرفر (الأحدث يفوز) */
 data class SyncRequest(
     val expenses: List<ExpenseDto>,
-    val settings: SettingsDto?
+    val templates: List<TemplateDto> = emptyList(),
+    val settings: SettingsDto? = null
 )
 
 /** استجابة السيرفر: الحالة الموحدة بعد الدمج */
 data class SyncResponse(
     val ok: Boolean,
     val expenses: List<ExpenseDto> = emptyList(),
+    val templates: List<TemplateDto> = emptyList(),
     val settings: SettingsDto? = null,
     val serverTime: Long = 0,
     val error: String? = null

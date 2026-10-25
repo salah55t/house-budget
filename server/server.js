@@ -3,9 +3,9 @@
  *  سيرفر مزامنة "حصالة البيت" (House Budget Sync)
  * ============================================
  * وسيط خفيف بين هاتفين يشاركان نفس رمز الربط:
- *  - الهاتف الأول يرفع مصاريفه وتحديثات الميزانية عبر POST /api/:code/sync
+ *  - الهاتف الأول يرفع مصاريفه وقوالبه وتحديثات الميزانية عبر POST /api/:code/sync
  *  - الهاتف الثاني يسحب الحالة الموحدة عبر نفس الطلب أو GET /api/:code/state
- *  - الدمج بقاعدة "الأحدث يفوز" حسب حقل updatedAt لكل سجل
+ *  - الدمج بقاعدة "الأحدث يفوز" حسب حقل updatedAt لكل سجل (مصاريف + قوالب + إعدادات)
  *
  * التخزين: ملف JSON خفيف (بدون أي قواعد بيانات خارجية) —
  * مثالي كوسيط مؤقت على خطة Render المجانية.
@@ -22,6 +22,7 @@ const DATA_FILE = path.join(DATA_DIR, 'sync-store.json');
 
 // حد أقصى للحماية من نمو غير طبيعي (يكفي لمصاريف بيت لسنوات)
 const MAX_EXPENSES_PER_HOUSE = 5000;
+const MAX_TEMPLATES_PER_HOUSE = 200;
 
 // رمز الربط: حروف إنجليزية وأرقام فقط، 4 إلى 32 محرفاً
 const CODE_RE = /^[A-Za-z0-9]{4,32}$/;
@@ -50,8 +51,10 @@ function persist() {
 }
 
 function getHouse(code) {
-  if (!store[code]) store[code] = { expenses: {}, settings: null };
+  if (!store[code]) store[code] = { expenses: {}, templates: {}, settings: null };
   if (!store[code].expenses) store[code].expenses = {};
+  // توافق خلفي: بيوت أُنشئت قبل إضافة القوالب
+  if (!store[code].templates) store[code].templates = {};
   return store[code];
 }
 
@@ -121,6 +124,7 @@ app.get('/api/:code/state', (req, res) => {
   res.json({
     ok: true,
     expenses: Object.values(house.expenses),
+    templates: Object.values(house.templates),
     settings: house.settings,
     serverTime: Date.now()
   });
@@ -155,12 +159,39 @@ app.post('/api/:code/sync', (req, res) => {
     }
   }
 
+  // دمج القوالب السريعة: نفس قاعدة الأحدث يفوز (تشمل علامات الحذف الناعم)
+  const incomingTemplates = Array.isArray(body.templates) ? body.templates : [];
+  for (const raw of incomingTemplates) {
+    if (!raw || typeof raw.id !== 'string') continue;
+    const clean = {
+      id: raw.id.slice(0, 64),
+      name: String(raw.name || '').slice(0, 120),
+      amount: Number(raw.amount) || 0,
+      category: String(raw.category || 'OTHER').slice(0, 16),
+      sortOrder: Number(raw.sortOrder) || 0,
+      updatedAt: Number(raw.updatedAt) || 0,
+      deleted: Boolean(raw.deleted)
+    };
+    const existing = house.templates[clean.id];
+    if (!existing || clean.updatedAt >= existing.updatedAt) {
+      house.templates[clean.id] = clean;
+    }
+  }
+
   // حد أقصى للحماية: عند التجاوز نحتفظ بالسجلات الأحدث تحديثاً
   const ids = Object.keys(house.expenses);
   if (ids.length > MAX_EXPENSES_PER_HOUSE) {
     ids.sort((a, b) => (house.expenses[a].updatedAt || 0) - (house.expenses[b].updatedAt || 0));
     const toRemove = ids.length - MAX_EXPENSES_PER_HOUSE;
     for (let i = 0; i < toRemove; i++) delete house.expenses[ids[i]];
+  }
+
+  // حد أقصى للحماية: عند التجاوز نحتفظ بالقوالب الأحدث تحديثاً
+  const tids = Object.keys(house.templates);
+  if (tids.length > MAX_TEMPLATES_PER_HOUSE) {
+    tids.sort((a, b) => (house.templates[a].updatedAt || 0) - (house.templates[b].updatedAt || 0));
+    const toRemoveT = tids.length - MAX_TEMPLATES_PER_HOUSE;
+    for (let i = 0; i < toRemoveT; i++) delete house.templates[tids[i]];
   }
 
   // دمج الإعدادات المشتركة: الأحدث زمنياً يفوز
@@ -183,6 +214,7 @@ app.post('/api/:code/sync', (req, res) => {
   res.json({
     ok: true,
     expenses: Object.values(house.expenses),
+    templates: Object.values(house.templates),
     settings: house.settings,
     serverTime: Date.now()
   });

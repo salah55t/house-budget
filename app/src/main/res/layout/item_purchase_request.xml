@@ -129,8 +129,8 @@
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/btn_reject_request"
-                    app:strokeColor="@color/status_red"
-                    app:textColor="@color/status_red" />
+                    android:textColor="@color/status_red"
+                    app:strokeColor="@color/status_red" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

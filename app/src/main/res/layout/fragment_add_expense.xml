@@ -56,7 +56,7 @@
                 android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- التصنيفات -->
+        <!-- التصنيفات السبعة: تُبنى ديناميكياً من Categories عند فتح الشاشة -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -66,54 +66,14 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
-        <HorizontalScrollView
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupCategories"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:scrollbars="none">
-
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chipGroupCategories"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:selectionRequired="true"
-                app:singleLine="true"
-                app:singleSelection="true">
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipFood"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checkable="true"
-                    android:text="@string/cat_food" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipBills"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checkable="true"
-                    android:text="@string/cat_bills" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipFun"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checkable="true"
-                    android:text="@string/cat_fun" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipOther"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checkable="true"
-                    android:checked="true"
-                    android:text="@string/cat_other" />
-            </com.google.android.material.chip.ChipGroup>
-        </HorizontalScrollView>
+            app:chipSpacing="6dp"
+            app:selectionRequired="true"
+            app:singleSelection="true" />
 
         <!-- القوالب السريعة -->
         <TextView

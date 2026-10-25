@@ -34,10 +34,6 @@
     <string name="hint_amount">المبلغ</string>
     <string name="hint_name">اسم المشتريات (اختياري)</string>
     <string name="label_category">التصنيف</string>
-    <string name="cat_food">أغذية</string>
-    <string name="cat_bills">فواتير</string>
-    <string name="cat_fun">ترفيه</string>
-    <string name="cat_other">أخرى</string>
     <string name="quick_templates">شراء سريع — قوالب جاهزة</string>
     <string name="quick_templates_hint">اضغط نقرة لتعبئة الحقول، واضغط مطولاً لحذف القالب</string>
     <string name="save_as_template">حفظ هذه العملية كقالب سريع للمستقبل</string>

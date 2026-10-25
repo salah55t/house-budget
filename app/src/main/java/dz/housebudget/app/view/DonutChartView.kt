@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import dz.housebudget.app.data.Categories
 import dz.housebudget.app.util.FormatUtils
 
 /**
@@ -17,16 +18,6 @@ class DonutChartView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
-
-    companion object {
-        // ألوان التصنيفات بترتيبها الثابت: أغذية، فواتير، ترفيه، أخرى
-        val COLORS = intArrayOf(
-            0xFF2E7D32.toInt(),
-            0xFF1565C0.toInt(),
-            0xFFF9A825.toInt(),
-            0xFF8D6E63.toInt()
-        )
-    }
 
     private var items: List<Pair<String, Double>> = emptyList()
     private var total: Double = 0.0
@@ -71,13 +62,13 @@ class DonutChartView @JvmOverloads constructor(
             return
         }
 
-        // رسم قوس كل تصنيف بلونه
+        // رسم قوس كل تصنيف بلونه (اللوحة الموحدة من Categories بنفس ترتيب البيانات)
         var startAngle = -90f
         items.forEachIndexed { index, pair ->
             val value = pair.second
             if (value > 0) {
                 val sweep = (value / total * 360.0).toFloat()
-                paint.color = COLORS[index % COLORS.size]
+                paint.color = Categories.PALETTE[index % Categories.PALETTE.size]
                 canvas.drawArc(rect, startAngle, sweep, false, paint)
                 startAngle += sweep
             }

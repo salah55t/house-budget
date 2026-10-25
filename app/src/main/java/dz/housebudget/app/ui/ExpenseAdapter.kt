@@ -4,11 +4,9 @@ import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import dz.housebudget.app.R
 import dz.housebudget.app.data.Categories
 import dz.housebudget.app.data.Expense
 import dz.housebudget.app.databinding.ItemExpenseBinding
@@ -47,14 +45,9 @@ class ExpenseAdapter(private val onDelete: ((Expense) -> Unit)?) :
         holder.binding.txtCategory.text = Categories.arabicName(item.category)
         holder.binding.txtAmount.text = "- " + FormatUtils.money(item.amount)
 
-        val colorRes = when (item.category) {
-            Categories.FOOD -> R.color.cat_food
-            Categories.BILLS -> R.color.cat_bills
-            Categories.FUN -> R.color.cat_fun
-            else -> R.color.cat_other
-        }
+        // لون نقطة التصنيف من اللوحة الموحدة (القيم القديمة غير المعروفة = لون "أخرى")
         holder.binding.catDot.backgroundTintList =
-            ColorStateList.valueOf(ContextCompat.getColor(context, colorRes))
+            ColorStateList.valueOf(Categories.color(item.category))
 
         if (onDelete != null) {
             holder.binding.btnDelete.visibility = View.VISIBLE

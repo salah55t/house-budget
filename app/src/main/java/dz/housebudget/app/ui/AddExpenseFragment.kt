@@ -1,5 +1,9 @@
 package dz.housebudget.app.ui
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -28,6 +32,9 @@ class AddExpenseFragment : Fragment() {
     private var _binding: FragmentAddExpenseBinding? = null
     private val binding get() = _binding!!
 
+    // خريطة تصنيف ← معرف الرقاقة الخاصة به (تُبنى ديناميكياً من Categories)
+    private val chipIds = mutableMapOf<String, Int>()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -40,6 +47,7 @@ class AddExpenseFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        buildCategoryChips()
         binding.btnSave.setOnClickListener { saveExpense() }
         binding.btnCancel.setOnClickListener { (activity as? MainActivity)?.showHome() }
 
@@ -47,6 +55,39 @@ class AddExpenseFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             BudgetRepository.templatesFlow.collect { templates -> renderTemplates(templates) }
         }
+    }
+
+    /**
+     * بناء رقائق التصنيفات ديناميكياً من قائمة Categories: كل رقاقة تحمل
+     * نقطة ملونة بلون التصنيف نفسه المستخدم في القوائم والرسوم.
+     * يُحدد "مصروف يومي" افتراضياً لأنه الأكثر تكراراً.
+     */
+    private fun buildCategoryChips() {
+        binding.chipGroupCategories.removeAllViews()
+        chipIds.clear()
+
+        Categories.all.forEach { category ->
+            val chip = layoutInflater.inflate(
+                R.layout.view_category_chip, binding.chipGroupCategories, false
+            ) as Chip
+            chip.text = Categories.arabicName(category)
+            chip.chipIcon = coloredDot(Categories.color(category))
+            chip.isChipIconVisible = true
+            chip.id = View.generateViewId()
+            binding.chipGroupCategories.addView(chip)
+            chipIds[category] = chip.id
+        }
+
+        binding.chipGroupCategories.check(chipIds.getValue(Categories.DAILY))
+    }
+
+    /** قرص دائري صغير بلون التصنيف لعرضه داخل الرقاقة */
+    private fun coloredDot(color: Int): BitmapDrawable {
+        val size = (12 * resources.displayMetrics.density).toInt().coerceAtLeast(12)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        return BitmapDrawable(resources, bitmap)
     }
 
     /** بناء رقائق القوالب ديناميكياً: نقرة لتعبئة الحقول، نقرة مطولة للحذف */
@@ -78,13 +119,10 @@ class AddExpenseFragment : Fragment() {
     private fun fillFromTemplate(template: QuickTemplate) {
         binding.inputAmount.setText(FormatUtils.number(template.amount))
         binding.inputName.setText(template.name)
-        val chipId = when (template.category) {
-            Categories.FOOD -> R.id.chipFood
-            Categories.BILLS -> R.id.chipBills
-            Categories.FUN -> R.id.chipFun
-            else -> R.id.chipOther
-        }
-        binding.chipGroupCategories.check(chipId)
+        // التصنيف القديم غير الموجود (بيانات قبل التحديث) يعود لـ مصروف يومي
+        binding.chipGroupCategories.check(
+            chipIds[template.category] ?: chipIds.getValue(Categories.DAILY)
+        )
         binding.inputLayoutAmount.error = null
     }
 
@@ -111,12 +149,9 @@ class AddExpenseFragment : Fragment() {
         }
         binding.inputLayoutAmount.error = null
 
-        val category = when (binding.chipGroupCategories.checkedChipId) {
-            R.id.chipFood -> Categories.FOOD
-            R.id.chipBills -> Categories.BILLS
-            R.id.chipFun -> Categories.FUN
-            else -> Categories.OTHER
-        }
+        // استخراج التصنيف من الرقاقة المحددة (احتياط: مصروف يومي)
+        val checkedId = binding.chipGroupCategories.checkedChipId
+        val category = chipIds.entries.firstOrNull { it.value == checkedId }?.key ?: Categories.DAILY
         val name = binding.inputName.text?.toString()?.trim()
             .orEmpty().ifBlank { Categories.arabicName(category) }
         val saveAsTemplate = binding.checkSaveTemplate.isChecked

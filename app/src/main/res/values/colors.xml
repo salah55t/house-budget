@@ -17,11 +17,9 @@
     <color name="chip_bg_yellow">#FFF8E1</color>
     <color name="chip_bg_red">#FFEBEE</color>
 
-    <!-- ألوان التصنيفات -->
-    <color name="cat_food">#2E7D32</color>
-    <color name="cat_bills">#1565C0</color>
-    <color name="cat_fun">#F9A825</color>
-    <color name="cat_other">#8D6E63</color>
+    <!-- ألوان التصنيفات: اللوحة الموحدة في Categories.kt (PALETTE) — لا حاجة لتكرارها هنا -->
+    <!-- أزرق ثانوي للثيم (كان يشاركه cat_bills سابقاً) -->
+    <color name="blue_secondary">#1565C0</color>
 
     <!-- النصوص -->
     <color name="text_main">#1F2937</color>

@@ -19,9 +19,24 @@ object FormatUtils {
     // تنسيق نسبة مئوية: 42%
     fun percent(value: Double): String = String.format(Locale.US, "%.0f%%", value)
 
-    // تحويل رقم مكتوب بحقل إدخال إلى Double (يتقبل الفاصلة العربية والنقطة)
-    fun parseAmount(text: String): Double? =
-        text.trim().replace(",", ".").replace("٫", ".").toDoubleOrNull()
+    // تحويل رقم مكتوب بحقل إدخال إلى Double:
+    // يتقبل الفاصلة العربية والنقطة + يوحّد الأرقام العربية ٠١٢٣ والفارسية ۰۱۲۳ إلى 0123
+    fun parseAmount(text: String): Double? {
+        val normalized = text.trim()
+            .map { DIGIT_MAP[it] ?: it }
+            .joinToString("")
+            .replace(",", ".")
+            .replace("٫", ".")
+        return normalized.toDoubleOrNull()
+    }
+
+    // خريطة تحويل الأرقام العربية-الهندية والفارسية إلى اللاتينية 0-9
+    private val DIGIT_MAP: Map<Char, Char> = buildMap {
+        val arabicIndic = listOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
+        val persian = listOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
+        arabicIndic.forEachIndexed { i, c -> put(c, ('0' + i)) }
+        persian.forEachIndexed { i, c -> put(c, ('0' + i)) }
+    }
 
     // تاريخ عربي مختصر: 12 أكتوبر
     fun shortDate(millis: Long): String {

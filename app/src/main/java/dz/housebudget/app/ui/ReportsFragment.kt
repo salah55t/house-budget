@@ -75,7 +75,7 @@ class ReportsFragment : Fragment() {
 
         // 2) مفتاح الرسم: صف لكل تصنيف (لون + اسم + مبلغ + نسبة)
         binding.legendContainer.removeAllViews()
-        byCategory.forEachIndexed { index, pair ->
+        byCategory.forEachIndexed { _, pair ->
             val cat = pair.first
             val value = pair.second
             if (value <= 0.0) return@forEachIndexed
@@ -88,8 +88,7 @@ class ReportsFragment : Fragment() {
             val dot = View(context)
             dot.layoutParams = LinearLayout.LayoutParams(dp(12), dp(12))
             dot.setBackgroundResource(R.drawable.bg_cat_dot)
-            dot.backgroundTintList =
-                ColorStateList.valueOf(dz.housebudget.app.view.DonutChartView.COLORS[index % 4])
+            dot.backgroundTintList = ColorStateList.valueOf(Categories.color(cat))
             row.addView(dot)
 
             val nameView = TextView(context)

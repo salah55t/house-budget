@@ -32,8 +32,9 @@ class HouseBudgetApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // فرض اللغة العربية على التطبيق كاملاً مهما كانت لغة الهاتف (RTL تلقائي)
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar"))
+        // فرض العربية الجزائرية (ar-DZ) على التطبيق كاملاً مهما كانت لغة الهاتف:
+        // RTL كامل + أرقام لاتينية عادية 123 (وليس ١٢٣/۱۲۳) وتواريخ بالنمط الجزائري
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar-DZ"))
 
         // تهيئة المستودع قبل أي شاشة
         BudgetRepository.init(this)
@@ -65,7 +66,10 @@ class HouseBudgetApp : Application() {
         }
     }
 
-    /** القوالب الجاهزة لأكثر المشتريات تكراراً: خبز، حليب، كهرباء، ماء، إنترنت */
+    /**
+     * القوالب الجاهزة المُزرعة عند أول تشغيل — مصممة على التصنيفات السبعة:
+     * مصروف يومي (خبز، حليب، ماء، ڨازوز) + خضر + لحوم.
+     */
     private suspend fun seedDefaultTemplates() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         if (prefs.getBoolean("templates_seeded", false)) return
@@ -74,11 +78,12 @@ class HouseBudgetApp : Application() {
         if (dao.count() == 0) {
             dao.upsertAll(
                 listOf(
-                    QuickTemplate(name = "خبز", amount = 50.0, category = Categories.FOOD, sortOrder = 0),
-                    QuickTemplate(name = "حليب", amount = 120.0, category = Categories.FOOD, sortOrder = 1),
-                    QuickTemplate(name = "كهرباء", amount = 1500.0, category = Categories.BILLS, sortOrder = 2),
-                    QuickTemplate(name = "ماء", amount = 800.0, category = Categories.BILLS, sortOrder = 3),
-                    QuickTemplate(name = "إنترنت", amount = 1000.0, category = Categories.BILLS, sortOrder = 4)
+                    QuickTemplate(name = "خبز", amount = 50.0, category = Categories.DAILY, sortOrder = 0),
+                    QuickTemplate(name = "حليب", amount = 120.0, category = Categories.DAILY, sortOrder = 1),
+                    QuickTemplate(name = "ماء", amount = 50.0, category = Categories.DAILY, sortOrder = 2),
+                    QuickTemplate(name = "ڨازوز", amount = 100.0, category = Categories.DAILY, sortOrder = 3),
+                    QuickTemplate(name = "خضر", amount = 400.0, category = Categories.VEG, sortOrder = 4),
+                    QuickTemplate(name = "لحوم", amount = 1200.0, category = Categories.MEAT, sortOrder = 5)
                 )
             )
         }

@@ -13,8 +13,10 @@ import dz.housebudget.app.data.AppSettings
 import dz.housebudget.app.data.PeriodTypes
 import dz.housebudget.app.databinding.FragmentSettingsBinding
 import dz.housebudget.app.repo.BudgetRepository
+import dz.housebudget.app.util.BudgetLogic
 import dz.housebudget.app.util.FormatUtils
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import kotlin.random.Random
 
 /**
@@ -25,6 +27,9 @@ class SettingsFragment : Fragment() {
 
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
+
+    // آخر لقطة إعدادات محملة، تُستخدم لحساب معاينة الدورة الحية عند تحريك الشريط
+    private var cachedSettings: AppSettings = AppSettings()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,9 +48,16 @@ class SettingsFragment : Fragment() {
             populate(BudgetRepository.settingsSnapshot())
         }
 
-        // نص مساعدة يوم البداية يتبع نوع الدورة
-        binding.radioMonthly.setOnCheckedChangeListener { _, _ -> updateStartDayHelper() }
-        binding.radioWeekly.setOnCheckedChangeListener { _, _ -> updateStartDayHelper() }
+        // نطاق الشريط ونصوص المساعدة تتبع نوع الدورة (شهرية 1–31 / أسبوعية 1–7)
+        binding.radioMonthly.setOnCheckedChangeListener { _, _ ->
+            updateSalaryDayWidgets(cachedSettings.startDay)
+        }
+        binding.radioWeekly.setOnCheckedChangeListener { _, _ ->
+            updateSalaryDayWidgets(cachedSettings.startDay)
+        }
+
+        // تحديث حي للقيمة والمعاينة أثناء تحريك شريط يوم الراتب
+        binding.sliderSalaryDay.addOnChangeListener { _, _, _ -> refreshSalaryDayLabels() }
 
         // هدف الادخار يظهر فقط عند تفعيل الوضع الاقتصادي
         binding.switchSaving.setOnCheckedChangeListener { _, checked ->
@@ -53,12 +65,15 @@ class SettingsFragment : Fragment() {
         }
 
         binding.btnSaveBudget.setOnClickListener { saveBudget() }
+        binding.btnSalaryToday.setOnClickListener { onSalaryDayToday() }
         binding.btnGenerateCode.setOnClickListener { binding.inputHouseCode.setText(randomCode()) }
         binding.btnTest.setOnClickListener { onTestConnection() }
         binding.btnSync.setOnClickListener { onSyncNow() }
     }
 
     private fun populate(settings: AppSettings) {
+        // تحديث اللقطة أولاً لأن مستمعي الراديو والشريط يعتمدونها في المعاينة الحية
+        cachedSettings = settings
         if (settings.totalBudget > 0) {
             binding.inputBudget.setText(FormatUtils.number(settings.totalBudget))
         }
@@ -67,7 +82,6 @@ class SettingsFragment : Fragment() {
         } else {
             binding.radioMonthly.isChecked = true
         }
-        binding.inputStartDay.setText(settings.startDay.toString())
         binding.switchSaving.isChecked = settings.savingModeEnabled
         binding.inputLayoutSavingGoal.visibility =
             if (settings.savingModeEnabled) View.VISIBLE else View.GONE
@@ -76,14 +90,64 @@ class SettingsFragment : Fragment() {
         }
         binding.inputServerUrl.setText(settings.serverUrl)
         binding.inputHouseCode.setText(settings.houseCode)
-        updateStartDayHelper()
+        updateSalaryDayWidgets(settings.startDay)
     }
 
-    private fun updateStartDayHelper() {
-        binding.inputLayoutStartDay.helperText = getString(
-            if (binding.radioWeekly.isChecked) R.string.start_day_hint_weekly
+    /** ضبط شريط يوم الراتب ونطاقه حسب نوع الدورة ثم تحديث القيمة والمعاينة */
+    private fun updateSalaryDayWidgets(savedDay: Int) {
+        val weekly = binding.radioWeekly.isChecked
+        binding.sliderSalaryDay.valueTo = (if (weekly) 7 else 31).toFloat()
+        binding.sliderSalaryDay.value = savedDay.coerceIn(1, if (weekly) 7 else 31).toFloat()
+        refreshSalaryDayLabels()
+    }
+
+    /** تحديث نص القيمة ونص المساعدة والمعاينة الحية لحدود الدورة من موضع الشريط */
+    private fun refreshSalaryDayLabels() {
+        val weekly = binding.radioWeekly.isChecked
+        val day = binding.sliderSalaryDay.value.toInt()
+        binding.txtSalaryDayValue.text = getString(
+            if (weekly) R.string.salary_day_value_weekly
+            else R.string.salary_day_value_monthly,
+            day
+        )
+        binding.txtStartDayHelper.text = getString(
+            if (weekly) R.string.start_day_hint_weekly
             else R.string.start_day_hint_monthly
         )
+
+        // معاينة فورية: حدود الدورة الحالية لو اعتمد المستخدم هذا اليوم الآن
+        val temp = cachedSettings.copy(
+            periodType = if (weekly) PeriodTypes.WEEKLY else PeriodTypes.MONTHLY,
+            startDay = day
+        )
+        val period = BudgetLogic.currentPeriod(temp)
+        binding.txtCyclePreview.text = getString(
+            R.string.cycle_preview,
+            FormatUtils.shortDate(period.startMillis),
+            FormatUtils.shortDate(period.endMillis)
+        )
+    }
+
+    /** زر سريع: اعتماد يوم اليوم الحالي كبداية الشهر المالي (يوم استلام الراتب) */
+    private fun onSalaryDayToday() {
+        val weekly = binding.radioWeekly.isChecked
+        val today = LocalDate.now()
+        val day = if (weekly) today.dayOfWeek.value else today.dayOfMonth.coerceIn(1, 31)
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            BudgetRepository.updateSettings { s -> s.copy(startDay = day) }
+            cachedSettings = BudgetRepository.settingsSnapshot()
+            updateSalaryDayWidgets(day)
+            Toast.makeText(
+                requireContext(),
+                getString(R.string.salary_day_applied, day),
+                Toast.LENGTH_SHORT
+            ).show()
+
+            (requireActivity().application as HouseBudgetApp).appScope.launch {
+                BudgetRepository.syncNow()
+            }
+        }
     }
 
     /** حفظ إعدادات الميزانية + مزامنة صامتة نحو الهاتف الآخر */
@@ -96,8 +160,8 @@ class SettingsFragment : Fragment() {
         binding.inputLayoutBudget.error = null
 
         val periodType = if (binding.radioWeekly.isChecked) PeriodTypes.WEEKLY else PeriodTypes.MONTHLY
-        val startDayRaw = binding.inputStartDay.text?.toString()?.toIntOrNull() ?: 1
-        val startDay = startDayRaw.coerceIn(1, if (periodType == PeriodTypes.WEEKLY) 7 else 31)
+        val startDay = binding.sliderSalaryDay.value.toInt()
+            .coerceIn(1, if (periodType == PeriodTypes.WEEKLY) 7 else 31)
         val goal = FormatUtils.parseAmount(binding.inputSavingGoal.text?.toString().orEmpty()) ?: 0.0
         val savingEnabled = binding.switchSaving.isChecked
 

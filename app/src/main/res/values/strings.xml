@@ -65,9 +65,15 @@
     <string name="hint_budget">الميزانية الإجمالية (الراتب)</string>
     <string name="radio_monthly">دورة شهرية</string>
     <string name="radio_weekly">دورة أسبوعية</string>
-    <string name="hint_start_day">يوم بداية الدورة</string>
-    <string name="start_day_hint_monthly">رقم اليوم من الشهر (1–31)، مثال: 1 = أول الشهر، 25 = يوم الراتب</string>
-    <string name="start_day_hint_weekly">رقم يوم الأسبوع (1–7): 1 = الاثنين … 7 = الأحد</string>
+    <string name="label_salary_day">بداية الشهر المالي (يوم استلام الراتب)</string>
+    <string name="salary_day_value_monthly">بداية الدورة: اليوم %d من كل شهر</string>
+    <string name="salary_day_value_weekly">بداية الدورة: اليوم %d من الأسبوع</string>
+    <string name="start_day_hint_monthly">حرّك الشريط إلى اليوم الذي تستلم فيه راتبك كل شهر؛ كل الحسابات والتقارير تبدأ من هذا اليوم. مثال: 25 تعني أن دورتك من 25 إلى 24 من الشهر التالي</string>
+    <string name="start_day_hint_weekly">حرّك الشريط إلى يوم الأسبوع الذي تبدأ منه دورتك: 1 = الاثنين … 7 = الأحد</string>
+    <string name="cycle_preview">دورتك الحالية: من %1$s إلى %2$s</string>
+    <string name="btn_salary_today">اليوم هو يوم الراتب</string>
+    <string name="salary_day_applied">تم اعتماد اليوم %d كبداية للشهر المالي</string>
+    <string name="cycle_range_home">دورة الحساب: من %1$s إلى %2$s</string>
     <string name="switch_saving">تفعيل الوضع الاقتصادي (هدف ادخاري)</string>
     <string name="hint_saving_goal">مبلغ الادخار المستهدف لهذه الدورة</string>
     <string name="btn_save_budget">حفظ إعدادات الميزانية</string>

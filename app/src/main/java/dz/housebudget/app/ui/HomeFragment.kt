@@ -81,6 +81,7 @@ class HomeFragment : Fragment() {
             binding.cardSaving.visibility = View.GONE
             binding.txtRemaining.text = FormatUtils.money(0.0)
             binding.txtBudgetLine.text = ""
+            binding.txtCycleRange.visibility = View.GONE
             binding.chipStatus.text = summary.statusLabel
             binding.txtPaceInfo.text = ""
             binding.progressRemaining.setProgress(0, true)
@@ -94,6 +95,14 @@ class HomeFragment : Fragment() {
             R.string.of_budget,
             FormatUtils.money(summary.total),
             FormatUtils.money(summary.spent)
+        )
+
+        // فترة الدورة الحالية (من يوم الراتب إلى قبل يوم الراتب التالي)
+        binding.txtCycleRange.visibility = View.VISIBLE
+        binding.txtCycleRange.text = getString(
+            R.string.cycle_range_home,
+            FormatUtils.shortDate(summary.period.startMillis),
+            FormatUtils.shortDate(summary.period.endMillis)
         )
 
         // لون مؤشر الصحة المالية: أخضر / أصفر / أحمر

@@ -9,3 +9,8 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+    envVars:
+      # نبض البقاء: السيرفر يطلب نفسه كل دقيقة ليمنع توقف الخطة المجانية
+      # بعد 15 دقيقة من الخمول (RENDER_EXTERNAL_URL يضبطه Render حكماً)
+      - key: SELF_PING_INTERVAL_MS
+        value: "60000"

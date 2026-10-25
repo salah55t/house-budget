@@ -93,7 +93,13 @@ app.get('/', (req, res) => {
 
 // فحص صحة عام
 app.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'house-budget-sync', time: Date.now() });
+  res.json({
+    ok: true,
+    service: 'house-budget-sync',
+    time: Date.now(),
+    uptimeSec: Math.floor(process.uptime()),
+    heartbeat: heartbeatState
+  });
 });
 
 // فحص وجود رمز الربط وصحة السيرفر
@@ -198,6 +204,63 @@ app.use((req, res) => {
   res.status(404).json({ ok: false, error: 'المسار غير موجود' });
 });
 
+// ---------- نبض البقاء (Keep-Alive) ----------
+/**
+ * الخطة المجانية على Render تُوقف السيرفر بعد 15 دقيقة من عدم النشاط،
+ * ثم يحتاج أول طلب بعدها إلى 30-50 ثانية للاستيقاظ (وهو ما قد يُفشل
+ * مزامنة الهاتف بسبب مهلة الاتصال).
+ *
+ * الحل: مؤقّت يرسل طلباً كل دقيقة إلى /health عبر الرابط الخارجي
+ * للسيرفر نفسه، فيبقى نشاط السيرفر متجددداً على مدار الساعة
+ * ولا ينام أبداً.
+ *
+ * آلية التشغيل:
+ *  - على Render: يُفعّل تلقائياً لأن Render يضبط RENDER_EXTERNAL_URL حكماً
+ *  - محلياً: معطّل افتراضياً (لا معنى لنبض محلي) — يمكن تفعيله للتجربة
+ *    بضبط SELF_PING_URL=http://127.0.0.1:3000
+ *  - سرعة النبض قابلة للضبط عبر SELF_PING_INTERVAL_MS (الافتراضي 60000 = دقيقة)
+ */
+const heartbeatState = { enabled: false, url: null, intervalMs: null, pings: 0, failures: 0, lastOkAt: null };
+
+function startHeartbeat() {
+  const rawBase = (process.env.SELF_PING_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
+  if (!rawBase) {
+    console.log('[النبض] معطّل — لا يوجد رابط خارجي (طبيعي محلياً)؛ على Render يُفعّل تلقائياً');
+    return;
+  }
+
+  const parsed = parseInt(process.env.SELF_PING_INTERVAL_MS || '', 10);
+  const intervalMs = parsed && parsed >= 1000 ? parsed : 60000;
+  const url = rawBase.replace(/\/+$/, '') + '/health';
+
+  heartbeatState.enabled = true;
+  heartbeatState.url = url;
+  heartbeatState.intervalMs = intervalMs;
+
+  const ping = async () => {
+    heartbeatState.pings++;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        heartbeatState.lastOkAt = Date.now();
+        console.log(`[النبض #${heartbeatState.pings}] ${res.status} — السيرفر مستيقظ`);
+      } else {
+        heartbeatState.failures++;
+        console.warn(`[النبض #${heartbeatState.pings}] استجابة غير سليمة: ${res.status}`);
+      }
+    } catch (e) {
+      heartbeatState.failures++;
+      console.warn(`[النبض #${heartbeatState.pings}] فشل الاتصال: ${e.message}`);
+    }
+  };
+
+  // نبضة فورية عند الإقلاع ثم نبضة كل دقيقة
+  ping();
+  setInterval(ping, intervalMs);
+  console.log(`[النبض] مفعّل — طلب كل ${intervalMs / 1000} ثانية نحو ${url}`);
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`سيرفر مزامنة حصالة البيت يعمل على المنفذ ${PORT}`);
+  startHeartbeat();
 });

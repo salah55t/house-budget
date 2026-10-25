@@ -1,0 +1,5 @@
+# ضبط نهايات الأسطر لتفادي مشاكل الصلاحيات على ويندوز
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary

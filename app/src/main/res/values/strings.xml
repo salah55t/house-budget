@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- الاسم العام -->
+    <string name="app_name">حصالة البيت</string>
+
+    <!-- شريط التنقل السفلي -->
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_expenses">المصاريف</string>
+    <string name="nav_reports">التقارير</string>
+    <string name="nav_settings">الإعدادات</string>
+    <string name="add_expense">إضافة مصروف</string>
+
+    <!-- الشاشة الرئيسية -->
+    <string name="remaining_budget">المتبقي من الميزانية</string>
+    <string name="of_budget">من %1$s • صرفت %2$s</string>
+    <string name="pace_info">باقٍ %1$s من الميزانية • مضى %2$s من الدورة</string>
+    <string name="days_left">أيام متبقية</string>
+    <string name="days_value">%1$d يوم</string>
+    <string name="delete">حذف</string>
+    <string name="daily_allowed">المسموح يومياً</string>
+    <string name="daily_avg">معدل صرفك</string>
+    <string name="smart_alert">تنبيه ذكي</string>
+    <string name="saving_mode">الوضع الاقتصادي</string>
+    <string name="saving_info">هدف الادخار: %1$s — ما زال عليك ادخاره: %2$s</string>
+    <string name="saving_daily">بعد خصم الادخار، المسموح صرفه يومياً: %1$s</string>
+    <string name="recent_ops">آخر العمليات</string>
+    <string name="empty_recent">لا عمليات بعد — أضف أول مصروف من الزر الأخضر</string>
+    <string name="budget_not_set">لم تُضبط الميزانية بعد</string>
+    <string name="budget_not_set_desc">اضبط راتبك أو ميزانيتك الكلية لتبدأ متابعة مصاريفك بذكاء وبرسائل تنبيه تلقائية.</string>
+    <string name="go_settings">ضبط الميزانية الآن</string>
+
+    <!-- شاشة إضافة مصروف -->
+    <string name="title_add_expense">إضافة مصروف جديد</string>
+    <string name="hint_amount">المبلغ</string>
+    <string name="hint_name">اسم المشتريات (اختياري)</string>
+    <string name="label_category">التصنيف</string>
+    <string name="cat_food">أغذية</string>
+    <string name="cat_bills">فواتير</string>
+    <string name="cat_fun">ترفيه</string>
+    <string name="cat_other">أخرى</string>
+    <string name="quick_templates">شراء سريع — قوالب جاهزة</string>
+    <string name="quick_templates_hint">اضغط نقرة لتعبئة الحقول، واضغط مطولاً لحذف القالب</string>
+    <string name="save_as_template">حفظ هذه العملية كقالب سريع للمستقبل</string>
+    <string name="btn_save">حفظ المصروف</string>
+    <string name="btn_cancel">إلغاء</string>
+    <string name="err_amount">أدخل مبلغاً صحيحاً أكبر من صفر</string>
+    <string name="saved_ok">تم حفظ المصروف بنجاح</string>
+
+    <!-- شاشة المصاريف -->
+    <string name="spent_of">مصاريف الدورة الحالية: %1$s</string>
+    <string name="ops_count">%1$d عملية</string>
+    <string name="empty_expenses_title">لا مصاريف بعد</string>
+    <string name="empty_expenses_desc">كل مصاريف دورتك الحالية ستظهر هنا مع إمكانية حذفها.</string>
+    <string name="delete_title">تأكيد الحذف</string>
+    <string name="delete_msg">هل تريد حذف «%1$s»؟ سيُحذف أيضاً من الهاتف الآخر عند المزامنة.</string>
+    <string name="delete_done">تم الحذف</string>
+
+    <!-- شاشة التقارير -->
+    <string name="reports_title_cat">توزيع المصاريف حسب التصنيف</string>
+    <string name="reports_title_days">صرف آخر 7 أيام</string>
+    <string name="total_spent_label">إجمالي المصروف</string>
+    <string name="top_category">أعلى تصنيف: %1$s بمبلغ %2$s</string>
+    <string name="ops_total">عدد العمليات في الدورة: %1$d</string>
+    <string name="avg_daily">متوسط الصرف اليومي: %1$s</string>
+    <string name="no_data">لا مصاريف بعد</string>
+
+    <!-- شاشة الإعدادات -->
+    <string name="settings_budget_section">الميزانية والدورة</string>
+    <string name="hint_budget">الميزانية الإجمالية (الراتب)</string>
+    <string name="radio_monthly">دورة شهرية</string>
+    <string name="radio_weekly">دورة أسبوعية</string>
+    <string name="hint_start_day">يوم بداية الدورة</string>
+    <string name="start_day_hint_monthly">رقم اليوم من الشهر (1–31)، مثال: 1 = أول الشهر، 25 = يوم الراتب</string>
+    <string name="start_day_hint_weekly">رقم يوم الأسبوع (1–7): 1 = الاثنين … 7 = الأحد</string>
+    <string name="switch_saving">تفعيل الوضع الاقتصادي (هدف ادخاري)</string>
+    <string name="hint_saving_goal">مبلغ الادخار المستهدف لهذه الدورة</string>
+    <string name="btn_save_budget">حفظ إعدادات الميزانية</string>
+    <string name="budget_saved_ok">تم حفظ الإعدادات بنجاح</string>
+    <string name="err_budget">أدخل ميزانية صحيحة أكبر من صفر</string>
+    <string name="settings_sync_section">المزامنة بين الهاتفين</string>
+    <string name="hint_server_url">رابط سيرفر Render</string>
+    <string name="hint_server_url_helper">مثال: house-budget-sync.onrender.com</string>
+    <string name="hint_house_code">رمز الربط بين الهاتفين</string>
+    <string name="btn_generate_code">توليد رمز جديد</string>
+    <string name="btn_test">فحص الاتصال</string>
+    <string name="btn_sync">مزامنة الآن</string>
+    <string name="syncing">جارٍ المزامنة…</string>
+    <string name="sync_ok">تمت المزامنة بنجاح — البيانات موحدة على السيرفر</string>
+    <string name="sync_help">اكتب نفس الرابط ونفس الرمز في هذا الهاتف وعلى الهاتف الثاني، وستتبادلان المصاريف والميزانية تلقائياً. أول هاتف يولّد الرمز يشاركه مع الآخر.</string>
+    <string name="connection_ok">الاتصال بالسيرفر يعمل بنجاح</string>
+    <string name="app_version">إصدار التطبيق 1.0 — حصالة البيت</string>
+</resources>

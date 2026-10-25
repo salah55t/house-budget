@@ -1,0 +1,53 @@
+# ============================================================
+#  خط إنتاج "حصالة البيت": بناء APK تلقائياً مع كل دفعة كود
+# ============================================================
+# ما يفعله هذا المسار:
+#  1) إعداد بيئة بناء أندرويد (Java 17 + Gradle مخزّن مؤقتاً)
+#  2) بناء نسختي APK: Debug و Release (موقّعة بمفتاح debug للتثبيت المباشر)
+#  3) رفع ملفي APK كـ Artifacts لتحميلهما من صفحة المسار وتثبيتهما مباشرة
+#
+# ملاحظة: runner الخاص بـ ubuntu-latest يحتوي Android SDK مسبقاً،
+# وGradle يكمل أي مكوّن ناقص تلقائياً.
+
+name: بناء تطبيق حصالة البيت
+
+on:
+  push:
+    branches: [ main, master, house-budget ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: بناء ملف APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: جلب الكود من المستودع
+        uses: actions/checkout@v4
+
+      - name: تثبيت Java JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: إعداد Gradle مع التخزين المؤقت
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: منح صلاحية التنفيذ لملف gradlew
+        run: chmod +x gradlew
+
+      - name: بناء نسختي APK (Debug + Release)
+        run: ./gradlew assembleDebug assembleRelease --stacktrace
+
+      - name: رفع APK نسخة Debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: حصالة-البيت-APK-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: رفع APK نسخة Release (قابل للتثبيت)
+        uses: actions/upload-artifact@v4
+        with:
+          name: حصالة-البيت-APK-release
+          path: app/build/outputs/apk/release/app-release.apk

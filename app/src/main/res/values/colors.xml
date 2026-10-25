@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- الهوية اللونية: أخضر مالي مع خلفيات كريمية -->
+    <color name="green_primary">#2E7D32</color>
+    <color name="green_dark">#1B5E20</color>
+    <color name="green_light">#E8F5E9</color>
+    <color name="cream_bg">#FAF7F0</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- ألوان مؤشر الصحة المالية (تنبيه الإفلاس التدريجي) -->
+    <color name="status_green">#2E7D32</color>
+    <color name="status_yellow">#F9A825</color>
+    <color name="status_red">#C62828</color>
+
+    <!-- خلفيات شارات الحالة الفاتحة -->
+    <color name="chip_bg_green">#E8F5E9</color>
+    <color name="chip_bg_yellow">#FFF8E1</color>
+    <color name="chip_bg_red">#FFEBEE</color>
+
+    <!-- ألوان التصنيفات -->
+    <color name="cat_food">#2E7D32</color>
+    <color name="cat_bills">#1565C0</color>
+    <color name="cat_fun">#F9A825</color>
+    <color name="cat_other">#8D6E63</color>
+
+    <!-- النصوص -->
+    <color name="text_main">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+
+    <!-- لون خلفية أيقونة التطبيق -->
+    <color name="icon_bg">#2E7D32</color>
+</resources>

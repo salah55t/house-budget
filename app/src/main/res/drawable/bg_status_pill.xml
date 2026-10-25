@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- حبة مستديرة لشارة الحالة (يُلوَّن برمجياً حسب مؤشر الصحة المالية) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="999dp" />
+    <solid android:color="#FFFFFF" />
+</shape>

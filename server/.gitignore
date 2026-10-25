@@ -1,0 +1,4 @@
+# مخزن البيانات المؤقت (لا يُرفع إلى GitHub)
+node_modules/
+data/
+.env

@@ -12,6 +12,7 @@ import dz.housebudget.app.data.QuickTemplate
 import dz.housebudget.app.sync.ApiClient
 import dz.housebudget.app.sync.ExpenseDto
 import dz.housebudget.app.sync.MessageDto
+import dz.housebudget.app.sync.MessagesPushRequest
 import dz.housebudget.app.sync.SettingsDto
 import dz.housebudget.app.sync.SyncRequest
 import dz.housebudget.app.sync.SyncResponse
@@ -21,6 +22,7 @@ import dz.housebudget.app.util.PeriodInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * المستودع المركزي: الطبقة الوحيدة التي تلمس قاعدة البيانات والشبكة.
@@ -33,10 +35,17 @@ object BudgetRepository {
     // معرف هذا الجهاز: يميّز المراسلات المرسلة من هذا الهاتف عن الواردة من الآخر
     private var deviceId: String = ""
 
+    // معرفات المراسلات المعدّلة محلياً ولم تُرفع للسيرفر بعد (المسار اللحظي)
+    private val dirtyMessageIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    // سياق التطبيق للتخزين المحلي الصغير (آخر طابع جلب للمراسلات)
+    private lateinit var appContext: Context
+
     // يجب استدعاؤه مرة واحدة من Application.onCreate قبل أي استخدام
     fun init(context: Context) {
         if (!::db.isInitialized) {
             db = AppDatabase.get(context)
+            appContext = context.applicationContext
             deviceId = loadOrCreateDeviceId(context.applicationContext)
         }
     }
@@ -147,15 +156,15 @@ object BudgetRepository {
 
     /** إرسال رسالة نصية عادية إلى الهاتف الآخر */
     suspend fun sendTextMessage(text: String, now: Long = System.currentTimeMillis()) {
-        db.messageDao().upsert(
-            HouseMessage(
-                type = MessageTypes.TEXT,
-                text = text.trim(),
-                senderId = deviceId,
-                createdAt = now,
-                updatedAt = now
-            )
+        val message = HouseMessage(
+            type = MessageTypes.TEXT,
+            text = text.trim(),
+            senderId = deviceId,
+            createdAt = now,
+            updatedAt = now
         )
+        db.messageDao().upsert(message)
+        dirtyMessageIds.add(message.id)
     }
 
     /** إرسال طلب شراء إلى الهاتف الآخر (يظهر لديه في قائمة انتظار الشراء) */
@@ -164,16 +173,16 @@ object BudgetRepository {
         suggestedPrice: Double,
         now: Long = System.currentTimeMillis()
     ) {
-        db.messageDao().upsert(
-            HouseMessage(
-                type = MessageTypes.REQUEST,
-                text = name.trim(),
-                suggestedPrice = suggestedPrice,
-                senderId = deviceId,
-                createdAt = now,
-                updatedAt = now
-            )
+        val message = HouseMessage(
+            type = MessageTypes.REQUEST,
+            text = name.trim(),
+            suggestedPrice = suggestedPrice,
+            senderId = deviceId,
+            createdAt = now,
+            updatedAt = now
         )
+        db.messageDao().upsert(message)
+        dirtyMessageIds.add(message.id)
     }
 
     /**
@@ -207,16 +216,17 @@ object BudgetRepository {
                 updatedAt = now
             )
         )
+        dirtyMessageIds.add(message.id)
     }
 
-    /** رفض طلب شراء: تبقى حالته معلّمة "مرفوض" وتنتقل للهاتف الآخر عند المزامنة */
+    /** رفض طلب شراء: تبقى حالته معلّمة "مرفوض" وتنتقل للهاتف الآخر لحظياً */
     suspend fun rejectRequest(message: HouseMessage) {
-        db.messageDao().upsert(
-            message.copy(
-                status = MessageStatus.REJECTED,
-                updatedAt = System.currentTimeMillis()
-            )
+        val updated = message.copy(
+            status = MessageStatus.REJECTED,
+            updatedAt = System.currentTimeMillis()
         )
+        db.messageDao().upsert(updated)
+        dirtyMessageIds.add(updated.id)
     }
 
     /** لقطة سريعة من الإعدادات الحالية */
@@ -234,8 +244,9 @@ object BudgetRepository {
     }
 
     /**
-     * مزامنة كاملة بثلاث خطوات:
-     * 1) رفع كل السجلات المحلية (بما فيها المحذوفة) ليندمجها السيرفر
+     * مزامنة كاملة بثلاث خطوات (كل دقيقة — الصمّام الأمان):
+     * 1) رفع كل السجلات المحلية (بما فيها المحذوفة) ليندمجها السيرفر؛
+     *    المراسلات تُرفع فقط المعدّلة محلياً (التاريخ كامل يمر عبر المسار اللحظي)
      * 2) السيرفر يدمج بقاعدة "الأحدث يفوز" حسب updatedAt
      * 3) تطبيق الحالة الموحدة القادمة من السيرفر على القاعدة المحلية
      */
@@ -249,7 +260,6 @@ object BudgetRepository {
 
             val localExpenses = db.expenseDao().getAllIncludingDeleted()
             val localTemplates = db.templateDao().getAllIncludingDeleted()
-            val localMessages = db.messageDao().getAllIncludingDeleted()
             val localSettings = SettingsDto(
                 totalBudget = settings.totalBudget,
                 periodType = settings.periodType,
@@ -259,18 +269,28 @@ object BudgetRepository {
                 updatedAt = settings.updatedAt
             )
 
+            // المراسلات: نرفع المعدّلة فقط إن وجدت؛ إن لا شيء يبقى الرد خفيفاً
+            val dirtyMessages = if (dirtyMessageIds.isEmpty()) {
+                emptyList()
+            } else {
+                db.messageDao().getAllIncludingDeleted()
+                    .filter { dirtyMessageIds.contains(it.id) }
+                    .map { it.toDto() }
+            }
+
             val response = api.sync(
                 settings.houseCode.trim(),
                 SyncRequest(
                     expenses = localExpenses.map { it.toDto() },
                     templates = localTemplates.map { it.toDto() },
-                    messages = localMessages.map { it.toDto() },
+                    messages = dirtyMessages,
                     settings = localSettings
                 )
             )
             if (!response.ok) {
                 return SyncResult.Error(response.error ?: "خطأ غير معروف من السيرفر")
             }
+            if (dirtyMessages.isNotEmpty()) dirtyMessageIds.clear()
 
             applyServerState(response)
             SyncResult.Success
@@ -291,6 +311,81 @@ object BudgetRepository {
             if (response.ok) null else response.error ?: "استجابة غير صالحة"
         } catch (e: Exception) {
             "فشل الاتصال: ${e.message ?: ""}"
+        }
+    }
+
+    // ---------- المسار اللحظي للمراسلات (الإصدار 1.5+) ----------
+
+    /**
+     * جلب المراسلات الجديدة فقط منذ آخر طابع زمني للسيرفر (حمولة صغيرة).
+     * تستدعاه خدمة المزامنة كل 2-5 ثوانٍ لشعور المحادثة بالفورية.
+     * يرجع true عند نجاح الدورة (حتى لو لا جديد) لتحديث الإشعارات بعدها.
+     */
+    suspend fun pullNewMessages(): Boolean {
+        val settings = settingsSnapshot()
+        if (settings.houseCode.isBlank() || settings.serverUrl.isBlank()) return false
+        return try {
+            val api = ApiClient.build(settings.serverUrl)
+            val response = api.pullMessages(
+                settings.houseCode.trim(),
+                since = loadLastPullAt()
+            )
+            if (!response.ok) return false
+            if (response.messages.isNotEmpty()) {
+                db.messageDao().upsertAll(response.messages.map { it.toEntity() })
+            }
+            saveLastPullAt(response.serverTime)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * رفع المراسلات المعدّلة محلياً فوراً عبر المسار اللحظي (إرسال خلال ثانية)،
+     * والاستجابة تعيد أيضاً الوارد الجديد منذ آخر جلب فيدمج هنا مباشرة.
+     * تستدعى بعد كل إرسال/شراء/رفض لتصل المراسلة للهاتف الآخر خلال ثوانٍ.
+     */
+    suspend fun pushDirtyMessages(): Boolean {
+        if (dirtyMessageIds.isEmpty()) return true
+        val settings = settingsSnapshot()
+        if (settings.houseCode.isBlank() || settings.serverUrl.isBlank()) return false
+        return try {
+            val api = ApiClient.build(settings.serverUrl)
+            val dirty = db.messageDao().getAllIncludingDeleted()
+                .filter { dirtyMessageIds.contains(it.id) }
+                .map { it.toDto() }
+            if (dirty.isEmpty()) {
+                dirtyMessageIds.clear()
+                return true
+            }
+            val response = api.pushMessages(
+                settings.houseCode.trim(),
+                since = loadLastPullAt(),
+                body = MessagesPushRequest(messages = dirty)
+            )
+            if (!response.ok) return false
+            dirtyMessageIds.removeAll(dirty.map { it.id }.toSet())
+            if (response.messages.isNotEmpty()) {
+                db.messageDao().upsertAll(response.messages.map { it.toEntity() })
+            }
+            saveLastPullAt(response.serverTime)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** آخر طابع زمني للسيرفر جُلبِت بعده المراسلات (محفوظ محلياً — محلي لهذا الجهاز) */
+    private fun loadLastPullAt(): Long {
+        val prefs = appContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        return prefs.getLong("last_pull_at", 0L)
+    }
+
+    private fun saveLastPullAt(serverTime: Long) {
+        if (serverTime > 0) {
+            appContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                .edit().putLong("last_pull_at", serverTime).apply()
         }
     }
 

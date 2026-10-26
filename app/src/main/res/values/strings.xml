@@ -88,9 +88,9 @@
     <string name="btn_sync">مزامنة الآن</string>
     <string name="syncing">جارٍ المزامنة…</string>
     <string name="sync_ok">تمت المزامنة بنجاح — البيانات موحدة على السيرفر</string>
-    <string name="sync_help">اكتب نفس الرابط ونفس الرمز في هذا الهاتف وعلى الهاتف الثاني، وستتبادلان المصاريف والميزانية تلقائياً. أول هاتف يولّد الرمز يشاركه مع الآخر.</string>
+    <string name="sync_help">اكتب نفس الرابط ونفس الرمز في هذا الهاتف وعلى الهاتف الثاني، وستتبادلان المصاريف والميزانية تلقائياً، وتصلك المراسلات لحظياً خلال ثوانٍ. أول هاتف يولّد الرمز يشاركه مع الآخر.</string>
     <string name="connection_ok">الاتصال بالسيرفر يعمل بنجاح</string>
-    <string name="app_version">إصدار التطبيق 1.0 — حصالة البيت</string>
+    <string name="app_version">إصدار التطبيق 1.5 — حصالة البيت</string>
 
     <!-- شاشة المراسلات: طلبات الشراء + الرسائل النصية -->
     <string name="nav_messages">المراسلات</string>
@@ -123,5 +123,26 @@
     <string name="empty_texts_desc">أرسل أول رسالة نصية إلى الهاتف الآخر.</string>
     <string name="hint_message">اكتب رسالة…</string>
     <string name="send">إرسال</string>
-    <string name="sync_failed_short">تعذرت المزامنة — سيُعاد الإرسال تلقائياً كل دقيقة</string>
+    <string name="sync_failed_short">تعذرت المزامنة — سيُعاد الإرسال تلقائياً خلال ثوانٍ</string>
+
+    <!-- الإشعارات الفورية (الإصدار 1.5): مثل واتساب حتى والتطبيق مغلق -->
+    <string name="settings_notif_section">الإشعارات الفورية</string>
+    <string name="switch_notif">إشعارات الرسائل وطلبات الشراء (مثل واتساب)</string>
+    <string name="notif_helper">تصلك الإشعارات لحظياً حتى لو كان التطبيق مغلقاً تماماً: رسالة جديدة، طلب شراء جديد، أو تغيّر حالة طلبك (تم الشراء/مرفوض). اترك الإشعار الصغير «المزامنة نشطة» يعمل ولا توقفه من إعدادات النظام.</string>
+    <string name="btn_battery">حماية الإشعارات من قتل البطارية</string>
+    <string name="battery_already_ok">الحماية مفعّلة أصلاً — الإشعارات ستعمل باستمرار</string>
+    <string name="notif_enabled_toast">الإشعارات الفورية مفعّلة — ستصلك الرسائل والطلبات لحظياً</string>
+    <string name="notif_disabled_toast">أُوقفت إشعارات المراسلات (المزامنة تبقى تعمل)</string>
+    <string name="notif_channel_service">خدمة المزامنة</string>
+    <string name="notif_channel_messages">الرسائل النصية</string>
+    <string name="notif_channel_requests">طلبات الشراء</string>
+    <string name="notif_service_title">المزامنة والمراسلات نشطة</string>
+    <string name="notif_service_text">إشعار فوري عند وصول أي رسالة أو طلب شراء — مثل واتساب</string>
+    <string name="notif_new_message_title">رسالة جديدة</string>
+    <string name="notif_new_request_title">طلب شراء جديد</string>
+    <string name="notif_request_price_body">السعر المقترح: %1$s</string>
+    <string name="notif_purchased_title">تم شراء طلبك</string>
+    <string name="notif_purchased_body">«%1$s» — بمبلغ %2$s خُصم من الميزانية</string>
+    <string name="notif_rejected_title">تم رفض طلبك</string>
+    <string name="notif_rejected_body">«%1$s» لم يُعتمد من الهاتف الآخر</string>
 </resources>

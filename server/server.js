@@ -183,29 +183,7 @@ app.post('/api/:code/sync', (req, res) => {
   }
 
   // دمج المراسلات (طلبات الشراء + الرسائل النصية): نفس قاعدة الأحدث يفوز
-  // حالة الطلب (PENDING/PURCHASED/REJECTED) تُدمج كسجل واحد كامل
-  const incomingMessages = Array.isArray(body.messages) ? body.messages : [];
-  const VALID_STATUSES = ['PENDING', 'PURCHASED', 'REJECTED'];
-  for (const raw of incomingMessages) {
-    if (!raw || typeof raw.id !== 'string') continue;
-    const clean = {
-      id: raw.id.slice(0, 64),
-      type: raw.type === 'REQUEST' ? 'REQUEST' : 'TEXT',
-      text: String(raw.text || '').slice(0, 500),
-      suggestedPrice: Number(raw.suggestedPrice) || 0,
-      status: VALID_STATUSES.includes(raw.status) ? raw.status : 'PENDING',
-      purchasedPrice: Number(raw.purchasedPrice) || 0,
-      expenseId: String(raw.expenseId || '').slice(0, 64),
-      senderId: String(raw.senderId || '').slice(0, 64),
-      createdAt: Number(raw.createdAt) || 0,
-      updatedAt: Number(raw.updatedAt) || 0,
-      deleted: Boolean(raw.deleted)
-    };
-    const existing = house.messages[clean.id];
-    if (!existing || clean.updatedAt >= existing.updatedAt) {
-      house.messages[clean.id] = clean;
-    }
-  }
+  const incomingMessages = mergeMessages(house, body.messages);
 
   // حد أقصى للحماية: عند التجاوز نحتفظ بالسجلات الأحدث تحديثاً
   const ids = Object.keys(house.expenses);
@@ -221,14 +199,6 @@ app.post('/api/:code/sync', (req, res) => {
     tids.sort((a, b) => (house.templates[a].updatedAt || 0) - (house.templates[b].updatedAt || 0));
     const toRemoveT = tids.length - MAX_TEMPLATES_PER_HOUSE;
     for (let i = 0; i < toRemoveT; i++) delete house.templates[tids[i]];
-  }
-
-  // حد أقصى للمراسلات: نحافظ على الأحدث (طلبات وحالة أحدث أولاً)
-  const mids = Object.keys(house.messages);
-  if (mids.length > MAX_MESSAGES_PER_HOUSE) {
-    mids.sort((a, b) => (house.messages[a].updatedAt || 0) - (house.messages[b].updatedAt || 0));
-    const toRemoveM = mids.length - MAX_MESSAGES_PER_HOUSE;
-    for (let i = 0; i < toRemoveM; i++) delete house.messages[mids[i]];
   }
 
   // دمج الإعدادات المشتركة: الأحدث زمنياً يفوز
@@ -252,11 +222,89 @@ app.post('/api/:code/sync', (req, res) => {
     ok: true,
     expenses: Object.values(house.expenses),
     templates: Object.values(house.templates),
-    messages: Object.values(house.messages),
+    // توفير الحجم: نرجع المراسلات فقط إذا رفع الهاتف مراسلات جديدة —
+    // الجلب اللحظي للمراسلات يمر عبر /api/:code/messages (الإصدار 1.5+)
+    messages: incomingMessages.length > 0 ? Object.values(house.messages) : [],
     settings: house.settings,
     serverTime: Date.now()
   });
 });
+
+// جلب المراسلات الجديدة فقط (مسار لحظي خفيف): استقصاء كل 2-5 ثوانٍ من التطبيق
+// ?since= طابع زمني للسيرفر — يرجع المراسلات التي استقبلها السيرفر بعده فقط
+app.get('/api/:code/messages', (req, res) => {
+  const code = req.params.code;
+  if (!isValidCode(code)) {
+    return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
+  }
+  const house = getHouse(code);
+  const since = Number(req.query.since) || 0;
+  const fresh = Object.values(house.messages).filter((m) => (m.receivedAt || 0) > since);
+  res.json({ ok: true, messages: fresh, serverTime: Date.now() });
+});
+
+// رفع مراسلات جديدة/معدّلة (رسالة مرسلة أو تغيير حالة طلب) — دمج فوري ثم إرجاع الوارد الجديد
+app.post('/api/:code/messages', (req, res) => {
+  const code = req.params.code;
+  if (!isValidCode(code)) {
+    return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
+  }
+  const house = getHouse(code);
+  const body = req.body || {};
+  mergeMessages(house, body.messages);
+  persist();
+  const since = Number(req.query.since) || 0;
+  const fresh = Object.values(house.messages).filter((m) => (m.receivedAt || 0) > since);
+  res.json({ ok: true, messages: fresh, serverTime: Date.now() });
+});
+
+/**
+ * دمج المراسلات بقاعدة "الأحدث يفوز" (مشترك بين /sync و /messages):
+ *  - المقارنة صارمة (>) حتى لا يُعاد رفع نفس النسخة غير المتغيرة في كل مزامنة
+ *    كاملة ويُحيّن طابع الاستقبال فيُرسل مجدداً للهاتف الآخر بلا داعٍ
+ *  - receivedAt: طابع زمني من ساعة السيرفر عند قبول السجل، هو أساس فلترة
+ *    الجلب اللحظي (since) — مستقل عن ساعات الهاتفين المتباعدتين
+ */
+function mergeMessages(house, rawList) {
+  const incoming = Array.isArray(rawList) ? rawList : [];
+  const VALID_STATUSES = ['PENDING', 'PURCHASED', 'REJECTED'];
+  let accepted = 0;
+  for (const raw of incoming) {
+    if (!raw || typeof raw.id !== 'string') continue;
+    const clean = {
+      id: raw.id.slice(0, 64),
+      type: raw.type === 'REQUEST' ? 'REQUEST' : 'TEXT',
+      text: String(raw.text || '').slice(0, 500),
+      suggestedPrice: Number(raw.suggestedPrice) || 0,
+      status: VALID_STATUSES.includes(raw.status) ? raw.status : 'PENDING',
+      purchasedPrice: Number(raw.purchasedPrice) || 0,
+      expenseId: String(raw.expenseId || '').slice(0, 64),
+      senderId: String(raw.senderId || '').slice(0, 64),
+      createdAt: Number(raw.createdAt) || 0,
+      updatedAt: Number(raw.updatedAt) || 0,
+      deleted: Boolean(raw.deleted)
+    };
+    const existing = house.messages[clean.id];
+    if (!existing || clean.updatedAt > existing.updatedAt) {
+      clean.receivedAt = Date.now();
+      house.messages[clean.id] = clean;
+      accepted++;
+    } else if (existing && !existing.receivedAt) {
+      // توافق خلفي: مراسلات قديمة أُنشئت قبل مسار اللحظية
+      existing.receivedAt = Date.now();
+      accepted++;
+    }
+  }
+
+  // حد أقصى للمراسلات: نحافظ على الأحدث (طلبات وحالة أحدث أولاً)
+  const mids = Object.keys(house.messages);
+  if (mids.length > MAX_MESSAGES_PER_HOUSE) {
+    mids.sort((a, b) => (house.messages[a].updatedAt || 0) - (house.messages[b].updatedAt || 0));
+    const toRemoveM = mids.length - MAX_MESSAGES_PER_HOUSE;
+    for (let i = 0; i < toRemoveM; i++) delete house.messages[mids[i]];
+  }
+  return incoming;
+}
 
 // حذف بيانات منزل معين بالكامل (إعادة ضبط اختيارية — لا يستخدمه التطبيق حالياً)
 app.delete('/api/:code', (req, res) => {

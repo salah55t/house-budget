@@ -7,26 +7,22 @@ import dz.housebudget.app.data.AppDatabase
 import dz.housebudget.app.data.Categories
 import dz.housebudget.app.data.QuickTemplate
 import dz.housebudget.app.repo.BudgetRepository
+import dz.housebudget.app.sync.SyncForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * كلاس التطبيق: تهيئة المستودع، فرض اللغة العربية (RTL كامل)،
  * وزرع القوالب السريعة الافتراضية عند أول تشغيل.
+ *
+ * من الإصدار 1.5: حلقة المزامنة انتقلت إلى SyncForegroundService (مسار لحظي
+ * كل 2-5 ثوانٍ + مزامنة كاملة كل دقيقة) — والنطاق العام يبقى هنا للشاشات.
  */
 class HouseBudgetApp : Application() {
 
-    companion object {
-        // فترة المزامنة التلقائية: دقيقة واحدة بالضبط (60 ثانية)
-        const val SYNC_INTERVAL_MS = 60_000L
-        // مهلة قصيرة قبل المزامنة الأولى لإتاحة وقت لإقلاع التطبيق والشبكة
-        const val FIRST_SYNC_DELAY_MS = 5_000L
-    }
-
-    // نطاق coroutine عام للتطبيق: يُستخدم للمزامنة الصامتة في الخلفية
+    // نطاق coroutine عام للتطبيق: تُستخدمه الشاشات للمزامنة الفورية الصامتة
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -42,28 +38,10 @@ class HouseBudgetApp : Application() {
         // زرع القوالب الافتراضية مرة واحدة فقط
         appScope.launch { seedDefaultTemplates() }
 
-        // بدء المزامنة التلقائية الدورية: كل دقيقة واحدة ما دام التطبيق يعمل
-        appScope.launch { autoSyncLoop() }
-    }
-
-    /**
-     * حلقة المزامنة التلقائية في الخلفية: تنفّذ مزامنة كاملة مع السيرفر
-     * كل دقيقة واحدة (جلب الجديد من الهاتف الآخر + رفع ما أُدخل محلياً).
-     *
-     * النتائج تُتجاهل بصمت هنا؛ رسائل الخطأ تظهر فقط في المزامنة اليدوية
-     * من شاشة الإعدادات. والدالة syncNow تتحقق داخلياً من ضبط رابط
-     * السيرفر ورمز الربط قبل أي اتصال، لذا لا ضرر قبل الإعداد.
-     */
-    private suspend fun autoSyncLoop() {
-        delay(FIRST_SYNC_DELAY_MS)
-        while (true) {
-            try {
-                BudgetRepository.syncNow()
-            } catch (_: Exception) {
-                // مزامنة صامتة: نؤجّل المحاولة إلى الدورة القادمة بعد دقيقة
-            }
-            delay(SYNC_INTERVAL_MS)
-        }
+        // خدمة المزامنة اللحظية والإشعارات: محاولة قلع صامتة هنا أيضاً
+        // (تفشل بهدوء إن كان الإقلاع من الخلفية على أندرويد 12+، والنشاط
+        // الرئيسي وجهاز استقبال الإقلاع يضمنان القلع في الحالات الأخرى)
+        SyncForegroundService.start(this)
     }
 
     /**

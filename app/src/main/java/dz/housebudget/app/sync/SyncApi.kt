@@ -8,6 +8,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 /** واجهة نقاط الاتصال (HTTP API) لسيرفر المزامنة */
@@ -16,6 +17,18 @@ interface SyncApi {
     // مزامنة كاملة: رفع البيانات المحلية واستقبال الحالة الموحدة
     @POST("api/{code}/sync")
     suspend fun sync(@Path("code") code: String, @Body body: SyncRequest): SyncResponse
+
+    // مسار لحظي: جلب المراسلات الجديدة فقط منذ طابع زمني للسيرفر (حمولة صغيرة)
+    @GET("api/{code}/messages")
+    suspend fun pullMessages(@Path("code") code: String, @Query("since") since: Long): MessagesResponse
+
+    // مسار لحظي: رفع مراسلات جديدة/معدّلة واستقبال الوارد الجديد في نفس الاستجابة
+    @POST("api/{code}/messages")
+    suspend fun pushMessages(
+        @Path("code") code: String,
+        @Query("since") since: Long,
+        @Body body: MessagesPushRequest
+    ): MessagesResponse
 
     // جلب الحالة فقط دون رفع شيء
     @GET("api/{code}/state")

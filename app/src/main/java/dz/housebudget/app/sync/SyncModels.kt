@@ -77,3 +77,20 @@ data class PingResponse(
     val name: String = "",
     val error: String? = null
 )
+
+/**
+ * المسار اللحظي للمراسلات (الإصدار 1.5+):
+ * طلب/إرسال المراسلات الجديدة فقط بحمولة صغيرة كل 2-5 ثوانٍ،
+ * بدل المزامنة الكاملة كل دقيقة — سرعة محادثة قريبة من الفورية.
+ */
+data class MessagesResponse(
+    val ok: Boolean,
+    val messages: List<MessageDto> = emptyList(),
+    val serverTime: Long = 0,
+    val error: String? = null
+)
+
+/** رفع مراسلات جديدة/معدّلة عبر المسار اللحظي */
+data class MessagesPushRequest(
+    val messages: List<MessageDto>
+)

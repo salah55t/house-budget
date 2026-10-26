@@ -1,10 +1,20 @@
 package dz.housebudget.app.ui
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import dz.housebudget.app.HouseBudgetApp
@@ -13,6 +23,7 @@ import dz.housebudget.app.data.AppSettings
 import dz.housebudget.app.data.PeriodTypes
 import dz.housebudget.app.databinding.FragmentSettingsBinding
 import dz.housebudget.app.repo.BudgetRepository
+import dz.housebudget.app.sync.SyncForegroundService
 import dz.housebudget.app.util.BudgetLogic
 import dz.housebudget.app.util.FormatUtils
 import kotlinx.coroutines.launch
@@ -21,7 +32,8 @@ import kotlin.random.Random
 
 /**
  * شاشة الإعدادات: الميزانية ودورتها، الوضع الاقتصادي (هدف ادخاري)،
- * وإعدادات المزامنة بين الهاتفين (رابط السيرفر + رمز الربط).
+ * إعدادات المزامنة بين الهاتفين (رابط السيرفر + رمز الربط)،
+ * وقسم الإشعارات الفورية (مثل واتساب) — محلي لهذا الجهاز ولا يُزامن.
  */
 class SettingsFragment : Fragment() {
 
@@ -69,6 +81,74 @@ class SettingsFragment : Fragment() {
         binding.btnGenerateCode.setOnClickListener { binding.inputHouseCode.setText(randomCode()) }
         binding.btnTest.setOnClickListener { onTestConnection() }
         binding.btnSync.setOnClickListener { onSyncNow() }
+
+        // الإشعارات الفورية: مفتاح محلي لهذا الجهاز (لا يُزامن) + حماية البطارية
+        setupNotificationsSection()
+    }
+
+    /** قسم الإشعارات الفورية: مفتاح التفعيل + زر تجاهل تحسين البطارية */
+    private fun setupNotificationsSection() {
+        val prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+        // نضبط القيمة قبل ربط المستمع كي لا تنطلق رسالة زائفة عند الفتح
+        binding.switchNotif.isChecked = prefs.getBoolean("notif_enabled", true)
+        binding.switchNotif.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("notif_enabled", checked).apply()
+            if (checked) {
+                // قلع الخدمة + طلب إذن الإشعارات على أندرويد 13+
+                SyncForegroundService.start(requireContext())
+                requestNotifPermissionIfNeeded()
+                Toast.makeText(requireContext(), R.string.notif_enabled_toast, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), R.string.notif_disabled_toast, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        binding.btnBattery.setOnClickListener { requestBatteryExemption() }
+    }
+
+    /** طلب إذن POST_NOTIFICATIONS على أندرويد 13+ */
+    private fun requestNotifPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                2001
+            )
+        }
+    }
+
+    /**
+     * حماية خدمة الإشعارات من قتل البطارية: بعض الأجهزة (شاومي، هواوي، سامسونج…)
+     * توقف الخدمات الخلفية بعنف؛ تجاهل تحسين البطارية يجعل الإشعارات تعمل
+     * باستمرار مثل واتساب حتى مع الشاشة مطفأة (وفي وضع Doze).
+     */
+    private fun requestBatteryExemption() {
+        val pm = requireContext().getSystemService(PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(requireContext().packageName)) {
+            Toast.makeText(requireContext(), R.string.battery_already_ok, Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            @Suppress("BatteryLife")
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + requireContext().packageName)
+                )
+            )
+        } catch (_: Exception) {
+            // بعض الأجهزة لا تدعم النافذة المباشرة: نفتح قائمة الإعدادات العامة
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun populate(settings: AppSettings) {

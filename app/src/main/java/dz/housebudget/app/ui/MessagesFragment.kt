@@ -18,6 +18,7 @@ import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.databinding.FragmentMessagesBinding
 import dz.housebudget.app.repo.BudgetRepository
+import dz.housebudget.app.sync.SyncForegroundService
 import dz.housebudget.app.util.FormatUtils
 import kotlinx.coroutines.launch
 
@@ -26,7 +27,8 @@ import kotlinx.coroutines.launch
  * 1) طلبات الشراء: قائمة انتظار الشراء بين الهاتفين؛ تحديد الطلب يُظهر خانة
  *    الثمن، وتأكيده يُنشئ مصروفاً فيُخصم من الميزانية تلقائياً.
  * 2) الرسائل النصية: محادثة نصية بسيطة بين الهاتفين.
- * كل شيء ينتقل عبر سيرفر المزامنة بنفس دورة الدقيقة الواحدة (ومزامنة فورية عند الإرسال).
+ * من الإصدار 1.5: الشاشة تجعل الخدمة تستقصي كل ثانيتين (محادثة لحظية)،
+ * وعند فتحها تجلب الجديد فوراً — فتظهر رسائل الطرف الآخر خلال ثوانٍ.
  */
 class MessagesFragment : Fragment() {
 
@@ -181,8 +183,25 @@ class MessagesFragment : Fragment() {
     /** مزامنة فورية صامتة في الخلفية: تصل المراسلة للهاتف الآخر خلال ثوانٍ */
     private fun syncInBackground() {
         (requireActivity().application as HouseBudgetApp).appScope.launch {
+            // رفع لحظي للمراسلة المرسلة + مزامنة كاملة (مصروف الطلب المشترى وغيره)
+            BudgetRepository.pushDirtyMessages()
             BudgetRepository.syncNow()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // المحادثة مفتوحة: استقصاء كل ثانيتين + بلا إشعارات مزدوجة (الرسائل أمامه)
+        SyncForegroundService.chatOpen = true
+        // جلب فوري لأي رسائل وصلت قبل فتح الشاشة
+        (requireActivity().application as HouseBudgetApp).appScope.launch {
+            BudgetRepository.pullNewMessages()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        SyncForegroundService.chatOpen = false
     }
 
     override fun onDestroyView() {

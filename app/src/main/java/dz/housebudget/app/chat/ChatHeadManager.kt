@@ -101,6 +101,10 @@ object ChatHeadManager {
     fun isEnabled(context: Context): Boolean =
         prefs(context).getBoolean(KEY_ENABLED, true)
 
+    /** هل لوحة المحادثة السريعة مفتوحة الآن؟ (تستخدمه الخدمة: استقصاء كل ثانيتين + بلا إشعارات مزدوجة) */
+    @JvmStatic
+    fun isPanelOpen(): Boolean = expanded
+
     private fun dp(value: Int): Int =
         (value * Resources.getSystem().displayMetrics.density).toInt()
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- خلفية الفقاعة العائمة: دائرة خضراء متدرجة بحد أبيض ناعم مثل ماسنجر -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:angle="270"
+        android:endColor="@color/green_dark"
+        android:startColor="#43A047" />
+    <stroke
+        android:width="2dp"
+        android:color="#FFFFFF" />
+</shape>

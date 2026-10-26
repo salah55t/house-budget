@@ -19,6 +19,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import dz.housebudget.app.HouseBudgetApp
 import dz.housebudget.app.R
+import dz.housebudget.app.chat.ChatHeadManager
 import dz.housebudget.app.data.AppSettings
 import dz.housebudget.app.data.PeriodTypes
 import dz.housebudget.app.databinding.FragmentSettingsBinding
@@ -84,6 +85,65 @@ class SettingsFragment : Fragment() {
 
         // الإشعارات الفورية: مفتاح محلي لهذا الجهاز (لا يُزامن) + حماية البطارية
         setupNotificationsSection()
+
+        // الفقاعة العائمة للمحادثة (مثل ماسنجر): تفعيل + إذن الظهور فوق التطبيقات
+        setupChatBubbleSection()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // حالة إذن الظهور فوق التطبيقات قد تكون تغيرت بعد العودة من إعدادات النظام
+        if (_binding != null) refreshBubbleStatus()
+    }
+
+    /** قسم الفقاعة العائمة: مفتاح تفعيل محلي + زر منح إذن الظهور فوق التطبيقات */
+    private fun setupChatBubbleSection() {
+        val prefs = requireContext().getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+        // نضبط القيمة قبل ربط المستمع كي لا تنطلق رسالة زائفة عند الفتح
+        binding.switchChatBubble.isChecked = prefs.getBoolean("chat_bubble_enabled", true)
+        binding.switchChatBubble.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("chat_bubble_enabled", checked).apply()
+            ChatHeadManager.refresh(requireContext())
+            Toast.makeText(
+                requireContext(),
+                if (checked) R.string.bubble_enabled_toast else R.string.bubble_disabled_toast,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        binding.btnOverlayPermission.setOnClickListener { requestOverlayPermission() }
+        refreshBubbleStatus()
+    }
+
+    /** سطر حالة إذن الظهور فوق التطبيقات: ممنوع = داخل التطبيق فقط */
+    private fun refreshBubbleStatus() {
+        binding.txtBubbleStatus.text = getString(
+            if (Settings.canDrawOverlays(requireContext())) R.string.overlay_granted
+            else R.string.overlay_not_granted
+        )
+    }
+
+    /** فتح شاشة نظام منح إذن الظهور فوق التطبيقات لهذا التطبيق تحديداً */
+    private fun requestOverlayPermission() {
+        if (Settings.canDrawOverlays(requireContext())) {
+            Toast.makeText(requireContext(), R.string.overlay_granted, Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + requireContext().packageName)
+                )
+            )
+        } catch (_: Exception) {
+            // بعض الأجهزة لا تدعم النافذة المباشرة: نفتح القائمة العامة
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /** قسم الإشعارات الفورية: مفتاح التفعيل + زر تجاهل تحسين البطارية */

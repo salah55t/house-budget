@@ -10,9 +10,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import dz.housebudget.app.chat.ChatHeadManager
+import dz.housebudget.app.repo.BudgetRepository
 import dz.housebudget.app.sync.SyncForegroundService
+import kotlinx.coroutines.launch
 import dz.housebudget.app.ui.AddExpenseFragment
 import dz.housebudget.app.ui.ExpensesFragment
 import dz.housebudget.app.ui.HomeFragment
@@ -26,6 +30,8 @@ import dz.housebudget.app.ui.SettingsFragment
  *
  * من الإصدار 1.5: يقلع خدمة المزامنة اللحظية والإشعارات عند فتح التطبيق،
  * ويطلب إذن الإشعارات على أندرويد 13+، ويستقبل نقرة إشعار لتفتح المراسلات.
+ * من الإصدار 1.6: يغذي الفقاعة العائمة للمحادثة (مثل ماسنجر) بتدفق المراسلات
+ * الحي ويتتبع حالة المقدمة/الخلفية لإظهارها وإخفائها في الوقت الصحيح.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -83,6 +89,27 @@ class MainActivity : AppCompatActivity() {
 
         // قلع خدمة المزامنة اللحظية والإشعارات (لا تكرار إن كانت تعمل أصلاً)
         SyncForegroundService.start(this)
+
+        // تدفق حي للمراسلات يغذي الفقاعة العائمة (الشارة والظهور) داخل التطبيق
+        lifecycleScope.launch {
+            BudgetRepository.messagesFlow.collect { ChatHeadManager.onMessagesChanged(it) }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // الفقاعة العائمة تعود لوضعها الصحيح (داخل التطبيق / فوق التطبيقات بعد منح الإذن)
+        ChatHeadManager.onAppResumed(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ChatHeadManager.onAppPaused()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        ChatHeadManager.onAppDestroyed()
     }
 
     /** نقرة إشعار والتطبيق يعمل بالفعل: نفتح المراسلات مباشرة */

@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import dz.housebudget.app.MainActivity
 import dz.housebudget.app.R
 import dz.housebudget.app.data.AppDatabase
+import dz.housebudget.app.chat.ChatHeadManager
 import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.repo.BudgetRepository
@@ -97,6 +98,14 @@ class SyncForegroundService : Service() {
         startForegroundWithNotification()
         running = true
         loopJob = scope.launch { syncLoop() }
+
+        // الفقاعة العائمة (مثل ماسنجر): ربطها فوق التطبيقات إن أُذن بذلك
+        scope.launch(Dispatchers.Main) { ChatHeadManager.refresh(applicationContext) }
+
+        // تدفق حي للمراسلات يغذي الفقاعة العائمة حتى والتطبيق في الخلفية
+        scope.launch(Dispatchers.Main) {
+            BudgetRepository.messagesFlow.collect { ChatHeadManager.onMessagesChanged(it) }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -142,9 +151,9 @@ class SyncForegroundService : Service() {
         }
     }
 
-    /** الإيقاع الحالي: ثانيتان بالمحادثة، 5 والشاشة مشغّلة، 30 والشاشة مطفأة */
+    /** الإيقاع الحالي: ثانيتان بالمحادثة أو بلوحة الفقاعة المفتوحة، 5 والشاشة مشغّلة، 30 والشاشة مطفأة */
     private fun currentInterval(): Long = when {
-        chatOpen -> INTERVAL_CHAT_MS
+        chatOpen || ChatHeadManager.isPanelOpen() -> INTERVAL_CHAT_MS
         powerManager.isInteractive -> INTERVAL_SCREEN_ON_MS
         else -> INTERVAL_SCREEN_OFF_MS
     }
@@ -191,8 +200,8 @@ class SyncForegroundService : Service() {
         }
         prefs.edit().putStringSet(KEY_SEEN_IDS, updatedSeen).apply()
 
-        // المستخدم يرى شاشة المراسلات الآن → الرسائل أمامه مباشرة، لا إشعار مزدوج
-        if (fresh.isEmpty() || chatOpen) return
+        // المستخدم يرى شاشة المراسلات أو لوحة الفقاعة العائمة الآن → لا إشعار مزدوج
+        if (fresh.isEmpty() || chatOpen || ChatHeadManager.isPanelOpen()) return
 
         for (m in fresh) {
             when {

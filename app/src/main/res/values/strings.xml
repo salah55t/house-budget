@@ -90,7 +90,7 @@
     <string name="sync_ok">تمت المزامنة بنجاح — البيانات موحدة على السيرفر</string>
     <string name="sync_help">اكتب نفس الرابط ونفس الرمز في هذا الهاتف وعلى الهاتف الثاني، وستتبادلان المصاريف والميزانية تلقائياً، وتصلك المراسلات لحظياً خلال ثوانٍ. أول هاتف يولّد الرمز يشاركه مع الآخر.</string>
     <string name="connection_ok">الاتصال بالسيرفر يعمل بنجاح</string>
-    <string name="app_version">إصدار التطبيق 1.5 — حصالة البيت</string>
+    <string name="app_version">إصدار التطبيق 1.6 — حصالة البيت</string>
 
     <!-- شاشة المراسلات: طلبات الشراء + الرسائل النصية -->
     <string name="nav_messages">المراسلات</string>
@@ -145,4 +145,18 @@
     <string name="notif_purchased_body">«%1$s» — بمبلغ %2$s خُصم من الميزانية</string>
     <string name="notif_rejected_title">تم رفض طلبك</string>
     <string name="notif_rejected_body">«%1$s» لم يُعتمد من الهاتف الآخر</string>
+
+    <!-- الفقاعة العائمة للمحادثة (الإصدار 1.6): إرسال واستقبال دون مغادرة الشاشة الحالية مثل ماسنجر -->
+    <string name="settings_bubble_section">الفقاعة العائمة للمحادثة</string>
+    <string name="switch_chat_bubble">فقاعة محادثة عائمة (مثل ماسنجر)</string>
+    <string name="bubble_helper">فقاعة صغيرة تطفو فوق أي شاشة داخل التطبيق: انقر عليها لتفتح محادثة سريعة وترد على الرسائل دون مغادرة الشاشة الحالية، واسحبها لتغيير مكانها (تتذكر مكانهَا). وفعّل إذن «الظهور فوق التطبيقات الأخرى» لتظهر الفقاعة فوق التطبيقات الأخرى عند وصول رسالة أو طلب شراء مثل ماسنجر تماماً.</string>
+    <string name="btn_overlay_permission">السماح بالظهور فوق التطبيقات الأخرى</string>
+    <string name="overlay_granted">الإذن ممنوح — الفقاعة ستظهر فوق التطبيقات الأخرى عند وصول رسالة أو طلب</string>
+    <string name="overlay_not_granted">الإذن غير ممنوح — الفقاعة تعمل حالياً داخل التطبيق فقط</string>
+    <string name="bubble_enabled_toast">الفقاعة العائمة مفعّلة — ستظهر فوق الشاشات</string>
+    <string name="bubble_disabled_toast">أُوقفت الفقاعة العائمة</string>
+    <string name="bubble_panel_title">محادثة سريعة</string>
+    <string name="bubble_panel_subtitle">مع الهاتف الآخر</string>
+    <string name="bubble_empty">لا رسائل بعد — ابدأ المحادثة من هنا</string>
+    <string name="bubble_desc">فقاعة المحادثة العائمة</string>
 </resources>

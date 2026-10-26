@@ -13,6 +13,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import dz.housebudget.app.HouseBudgetApp
 import dz.housebudget.app.R
+import dz.housebudget.app.chat.ChatHeadManager
 import dz.housebudget.app.data.HouseMessage
 import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
@@ -193,6 +194,8 @@ class MessagesFragment : Fragment() {
         super.onResume()
         // المحادثة مفتوحة: استقصاء كل ثانيتين + بلا إشعارات مزدوجة (الرسائل أمامه)
         SyncForegroundService.chatOpen = true
+        // كل المراسلات الظاهرة الآن مقروءة: شارة الفقاعة العائمة تُصفّر وتختفي
+        ChatHeadManager.onMessagesScreenVisibility(true)
         // جلب فوري لأي رسائل وصلت قبل فتح الشاشة
         (requireActivity().application as HouseBudgetApp).appScope.launch {
             BudgetRepository.pullNewMessages()
@@ -202,6 +205,8 @@ class MessagesFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         SyncForegroundService.chatOpen = false
+        // الخروج من شاشة المراسلات: ما رآه المستخدم مقروء والفقاعة تعود للظهور
+        ChatHeadManager.onMessagesScreenVisibility(false)
     }
 
     override fun onDestroyView() {

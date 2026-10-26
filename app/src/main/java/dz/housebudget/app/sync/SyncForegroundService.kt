@@ -27,6 +27,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 /**
  * خدمة المزامنة اللحظية والإشعارات (الإصدار 1.5+ — مثل واتساب):
@@ -117,7 +118,7 @@ class SyncForegroundService : Service() {
         delay(FIRST_TICK_DELAY_MS)
         var lastFullSyncAt = 0L // صفر = مزامنة كاملة فورية عند الإقلاع (تعويض أي فترة انقطاع)
 
-        while (isActive) {
+        while (coroutineContext.isActive) {
             try {
                 if (isConfigured()) {
                     // 1) المسار اللحظي: المراسلات الجديدة فقط (حمولة صغيرة)

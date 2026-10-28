@@ -14,6 +14,7 @@ import dz.housebudget.app.sync.ExpenseDto
 import dz.housebudget.app.sync.MessageDto
 import dz.housebudget.app.sync.MessagesPushRequest
 import dz.housebudget.app.sync.SettingsDto
+import dz.housebudget.app.sync.SyncForegroundService
 import dz.housebudget.app.sync.SyncRequest
 import dz.housebudget.app.sync.SyncResponse
 import dz.housebudget.app.sync.TemplateDto
@@ -165,6 +166,8 @@ object BudgetRepository {
         )
         db.messageDao().upsert(message)
         dirtyMessageIds.add(message.id)
+        // علّمها كمشاهدة محلياً: رسائلي أنا لا تُشعرني (بينما يُشعَر الطرف الآخر)
+        SyncForegroundService.acknowledgeMessage(appContext, message.id, now)
     }
 
     /** إرسال طلب شراء إلى الهاتف الآخر (يظهر لديه في قائمة انتظار الشراء) */
@@ -183,6 +186,8 @@ object BudgetRepository {
         )
         db.messageDao().upsert(message)
         dirtyMessageIds.add(message.id)
+        // علّمها كمشاهدة محلياً: طلبي أنا بحالته الأولي لا يُشعرني
+        SyncForegroundService.acknowledgeMessage(appContext, message.id, now)
     }
 
     /**
@@ -217,6 +222,8 @@ object BudgetRepository {
             )
         )
         dirtyMessageIds.add(message.id)
+        // شرائي بنفسي لا يُشعرني — لكنه سيُشعر صاحب الطلب في الهاتف الآخر
+        SyncForegroundService.acknowledgeMessage(appContext, message.id, now)
     }
 
     /** رفض طلب شراء: تبقى حالته معلّمة "مرفوض" وتنتقل للهاتف الآخر لحظياً */
@@ -227,6 +234,8 @@ object BudgetRepository {
         )
         db.messageDao().upsert(updated)
         dirtyMessageIds.add(updated.id)
+        // رفضي بنفسي لا يُشعرني — لكنه سيُشعر صاحب الطلب في الهاتف الآخر
+        SyncForegroundService.acknowledgeMessage(appContext, updated.id, updated.updatedAt)
     }
 
     /** لقطة سريعة من الإعدادات الحالية */

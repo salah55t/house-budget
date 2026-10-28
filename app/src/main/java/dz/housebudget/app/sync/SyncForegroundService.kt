@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -28,7 +29,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import kotlin.coroutines.coroutineContext
+import kotlin.math.max
 
 /**
  * خدمة المزامنة اللحظية والإشعارات (الإصدار 1.5+ — مثل واتساب):
@@ -71,8 +74,54 @@ class SyncForegroundService : Service() {
         // مفاتيح التخزين المحلي
         const val PREFS = "app_prefs"
         const val KEY_NOTIF_ENABLED = "notif_enabled"
-        const val KEY_SEEN_IDS = "notif_seen_ids"
+
+        // خريطة المشاهدات: {معرّف المراسلة: آخر طابع تحديث شوهد} —
+        // تتبع الطابع بدل المعرّف فقط حتى تصل إشعارات تغيّر حالة طلب موجود
+        // (تم الشراء/مرفوض) التي لا تغيّر معرّفه بل طابعه الزمني
+        const val KEY_SEEN_MAP = "notif_seen_map"
         private const val MAX_SEEN_IDS = 400
+
+        // قفل حماية خريطة المشاهدات من تسابق خيوط الخدمة والمستودع
+        private val SEEN_LOCK = Any()
+
+        /** تحميل خريطة المشاهدات من التخزين (صيغة JSON خفيفة) */
+        @JvmStatic
+        fun loadSeenMap(prefs: SharedPreferences): MutableMap<String, Long> {
+            val map = mutableMapOf<String, Long>()
+            val raw = prefs.getString(KEY_SEEN_MAP, null) ?: return map
+            try {
+                val jo = JSONObject(raw)
+                for (k in jo.keys()) map[k] = jo.optLong(k, 0L)
+            } catch (_: Exception) {
+                // ملف تالف: نبدأ بخريطة فارغة (قد يعاد إشعار أحدث المراسلات مرة واحدة)
+            }
+            return map
+        }
+
+        /** حفظ خريطة المشاهدات في التخزين */
+        @JvmStatic
+        fun saveSeenMap(prefs: SharedPreferences, map: Map<String, Long>) {
+            val jo = JSONObject()
+            for ((k, v) in map) jo.put(k, v)
+            prefs.edit().putString(KEY_SEEN_MAP, jo.toString()).apply()
+        }
+
+        /**
+         * ختم مراسلة عدّلها هذا الجهاز محلياً (إرسال/شراء/رفض) كمُشاهدة —
+         * كي لا يُشعَر المستخدم بفعل أنجزه بنفسه، بينما يبقى أي تغيير قادم
+         * من الهاتف الآخر (أحدث طابعاً) مؤهّلاً للإشعار.
+         */
+        @JvmStatic
+        fun acknowledgeMessage(context: Context, id: String, updatedAt: Long) {
+            synchronized(SEEN_LOCK) {
+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                val map = loadSeenMap(prefs)
+                if ((map[id] ?: 0L) < updatedAt) {
+                    map[id] = updatedAt
+                    saveSeenMap(prefs, map)
+                }
+            }
+        }
 
         // معرفات قنوات الإشعارات
         const val CHANNEL_SERVICE = "sync_service"
@@ -181,40 +230,47 @@ class SyncForegroundService : Service() {
             .filter { !it.deleted }
         val myId = BudgetRepository.myDeviceId()
 
-        // أول تشغيل: علّم كل الموجود كمشاهد فلا تُشعَر بقائمة قديمة كاملة
-        if (!prefs.contains(KEY_SEEN_IDS)) {
-            prefs.edit().putStringSet(KEY_SEEN_IDS, all.map { it.id }.toSet()).apply()
-            return
-        }
+        synchronized(SEEN_LOCK) {
+            // أول تشغيل (أو ترقية من آلية المعرفات القديمة): علّم كل الموجود
+            // بمطابقة طوابع التحديث الحالية فلا تُشعَر بقائمة قديمة كاملة
+            if (!prefs.contains(KEY_SEEN_MAP)) {
+                val seed = all.associate { it.id to it.updatedAt }
+                saveSeenMap(prefs, seed)
+                return
+            }
 
-        val seen = (prefs.getStringSet(KEY_SEEN_IDS, emptySet()) ?: emptySet()).toMutableSet()
-        val fresh = all.filter { it.id !in seen }
+            val seenMap = loadSeenMap(prefs)
 
-        // علّم كل المعرفات الحالية كمشاهدة (بما فيها رسائلي) لتفادي أي تكرار لاحق
-        val updatedSeen = (seen + all.map { it.id }.toSet()).toMutableSet()
-        if (updatedSeen.size > MAX_SEEN_IDS) {
-            // تقليم: أبقِ معرفات أحدث 300 مراسلة فقط
-            val keep = all.sortedByDescending { it.updatedAt }.take(MAX_SEEN_IDS - 100)
-                .map { it.id }.toSet()
-            updatedSeen.retainAll(keep)
-        }
-        prefs.edit().putStringSet(KEY_SEEN_IDS, updatedSeen).apply()
+            // الجديد: معرّف لم نشهده من قبل، أو حالة تغيّرت بتحديث أحدث مما شهدناه
+            // (مثل «تم الشراء»/«مرفوض» الواردة من الهاتف الآخر لنفس المعرّف)
+            val fresh = all.filter { m -> (seenMap[m.id] ?: 0L) < m.updatedAt }
 
-        // المستخدم يرى شاشة المراسلات أو لوحة الفقاعة العائمة الآن → لا إشعار مزدوج
-        if (fresh.isEmpty() || chatOpen || ChatHeadManager.isPanelOpen()) return
+            // علّم كل الحالي بمطابقة أطوابع التحديث لتفادي أي تكرار لاحق
+            for (m in all) seenMap[m.id] = max(seenMap[m.id] ?: 0L, m.updatedAt)
+            if (seenMap.size > MAX_SEEN_IDS) {
+                // تقليم: أبقِ أحدث 300 مراسلة فقط
+                val keep = all.sortedByDescending { it.updatedAt }
+                    .take(MAX_SEEN_IDS - 100).map { it.id }.toSet()
+                seenMap.keys.retainAll(keep)
+            }
+            saveSeenMap(prefs, seenMap)
 
-        for (m in fresh) {
-            when {
-                m.type == MessageTypes.TEXT && m.senderId != myId ->
-                    notify(m, Kind.NEW_MESSAGE)
+            // المستخدم يرى شاشة المراسلات أو لوحة الفقاعة العائمة الآن → لا إشعار مزدوج
+            if (fresh.isEmpty() || chatOpen || ChatHeadManager.isPanelOpen()) return
 
-                m.type == MessageTypes.REQUEST && m.senderId != myId &&
-                    m.status == MessageStatus.PENDING ->
-                    notify(m, Kind.NEW_REQUEST)
+            for (m in fresh) {
+                when {
+                    m.type == MessageTypes.TEXT && m.senderId != myId ->
+                        notify(m, Kind.NEW_MESSAGE)
 
-                m.type == MessageTypes.REQUEST && m.senderId == myId &&
-                    m.status != MessageStatus.PENDING ->
-                    notify(m, if (m.status == MessageStatus.PURCHASED) Kind.PURCHASED else Kind.REJECTED)
+                    m.type == MessageTypes.REQUEST && m.senderId != myId &&
+                        m.status == MessageStatus.PENDING ->
+                        notify(m, Kind.NEW_REQUEST)
+
+                    m.type == MessageTypes.REQUEST && m.senderId == myId &&
+                        m.status != MessageStatus.PENDING ->
+                        notify(m, if (m.status == MessageStatus.PURCHASED) Kind.PURCHASED else Kind.REJECTED)
+                }
             }
         }
     }

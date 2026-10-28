@@ -14,8 +14,8 @@ android {
         // الحد الأدنى: أندرويد 10 (API 29) كما هو مطلوب
         minSdk = 29
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
     }
 
     buildTypes {

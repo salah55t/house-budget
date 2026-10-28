@@ -114,8 +114,10 @@ class ChatAdapter : ListAdapter<HouseMessage, ChatAdapter.VH>(DIFF), AudioPlayer
                         if (playing) R.drawable.ic_pause else R.drawable.ic_play
                     )
                     b.seekAudio.isEnabled = true
-                    val durationMs = AudioPlayer.currentDurationMs()
+                    // المدة بميلي ثانية (Long): من المشغّل إن كان المسار نشطاً وإلا من الملف
+                    val durationMs: Long = AudioPlayer.currentDurationMs()
                         .takeIf { active && it > 0 }
+                        ?.toLong()
                         ?: MediaCache.audioDurationMs(file!!)
                     val positionMs = if (active) AudioPlayer.currentPositionMs() else 0
 
@@ -123,7 +125,7 @@ class ChatAdapter : ListAdapter<HouseMessage, ChatAdapter.VH>(DIFF), AudioPlayer
                         if (playing) positionMs.toLong() else durationMs
                     )
                     b.seekAudio.progress = if (durationMs > 0) {
-                        (positionMs * 1000 / durationMs)
+                        (positionMs.toLong() * 1000L / durationMs).toInt()
                     } else 0
 
                     b.btnPlay.setOnClickListener {
@@ -135,7 +137,7 @@ class ChatAdapter : ListAdapter<HouseMessage, ChatAdapter.VH>(DIFF), AudioPlayer
                             sb: android.widget.SeekBar?, progress: Int, fromUser: Boolean
                         ) {
                             if (fromUser && AudioPlayer.isActive(msg.id) && durationMs > 0) {
-                                AudioPlayer.seekTo(progress * durationMs / 1000)
+                                AudioPlayer.seekTo((progress.toLong() * durationMs / 1000L).toInt())
                             }
                         }
 

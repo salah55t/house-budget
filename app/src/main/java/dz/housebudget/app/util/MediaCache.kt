@@ -48,7 +48,7 @@ object MediaCache {
             localFile(context, houseCode, msg.mediaFile, msg.mediaType).exists()
 
     // منع التحميل المزدوج لنفس الملف من عدة خيوط في نفس اللحظة
-    private val inProgress = HashSet<String>()
+    private val inProgress = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /**
      * تحميل ملف وسائط من السيرفر إن لم يكن محمّلاً بعد.

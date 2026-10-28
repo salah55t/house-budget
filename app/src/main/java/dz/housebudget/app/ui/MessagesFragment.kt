@@ -194,7 +194,7 @@ class MessagesFragment : Fragment() {
         img.adjustViewBounds = true
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(if (msg.text.isNotBlank()) msg.text else R.string.media_image_desc)
+            .setTitle(if (msg.text.isNotBlank()) msg.text else getString(R.string.media_image_desc))
             .setView(img)
             .setPositiveButton(R.string.btn_cancel, null)
             .show()

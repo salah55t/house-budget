@@ -27,7 +27,7 @@ data class TemplateDto(
     val deleted: Boolean = false
 )
 
-/** نسخة المراسلة (طلب شراء أو رسالة نصية) القابلة للنقل عبر الشبكة */
+/** نسخة المراسلة (طلب شراء، رسالة نصية، رسالة صوتية أو صورة) القابلة للنقل عبر الشبكة */
 data class MessageDto(
     val id: String,
     val type: String,
@@ -37,6 +37,9 @@ data class MessageDto(
     val purchasedPrice: Double = 0.0,
     val expenseId: String = "",
     val senderId: String = "",
+    // مرفق الوسائط (الإصدار 1.8): "" / IMAGE / AUDIO + معرّف الملف على السيرفر
+    val mediaType: String = "",
+    val mediaFile: String = "",
     val createdAt: Long,
     val updatedAt: Long,
     val deleted: Boolean = false
@@ -93,4 +96,23 @@ data class MessagesResponse(
 /** رفع مراسلات جديدة/معدّلة عبر المسار اللحظي */
 data class MessagesPushRequest(
     val messages: List<MessageDto>
+)
+
+/**
+ * رفع ملف وسائط (رسالة صوتية أو صورة — الإصدار 1.8):
+ * البيانات ترمّز base64 داخل JSON لتبسيط العميل، والسيرفر يفكها ويخزنها
+ * كملف ثنائي ويُرجع معرّفاً فريداً تشير إليه المراسلة في حقل mediaFile.
+ */
+data class FileUploadRequest(
+    val name: String,
+    val mime: String,
+    val data: String
+)
+
+/** استجابة رفع ملف وسائط: معرّف الملف المرجعي للمراسلة */
+data class FileUploadResponse(
+    val ok: Boolean,
+    val id: String = "",
+    val size: Long = 0,
+    val error: String? = null
 )

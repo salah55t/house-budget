@@ -13,10 +13,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *
  * النسخة 2: القوالب السريعة أصبحت قابلة للمزامنة (معرّف UUID + طابع زمني + حذف ناعم)
  * النسخة 3: جدول المراسلات (طلبات الشراء + الرسائل النصية) بين الهاتفين
+ * النسخة 4: مرفقات الوسائط في المراسلات (رسائل صوتية وصور — mediaType/mediaFile)
  */
 @Database(
     entities = [Expense::class, QuickTemplate::class, AppSettings::class, HouseMessage::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -82,6 +83,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * هجرة 3 → 4: مرفقات الوسائط في المراسلات (الإصدار 1.8).
+         * عمودان جديدان فقط مع قيم افتراضية فارغة — كل المراسلات القديمة
+         * تبقى كما هي بلا أي نقل بيانات.
+         */
+        private val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN mediaType TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE messages ADD COLUMN mediaFile TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         // نمط Singleton الآمن للخيوط: نسخة واحدة من القاعدة في كل التطبيق
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
@@ -90,7 +103,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "house_budget.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

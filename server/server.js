@@ -19,11 +19,20 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'sync-store.json');
+const FILES_DIR = path.join(DATA_DIR, 'files');
+const crypto = require('crypto');
 
 // حد أقصى للحماية من نمو غير طبيعي (يكفي لمصاريف بيت لسنوات)
 const MAX_EXPENSES_PER_HOUSE = 5000;
 const MAX_TEMPLATES_PER_HOUSE = 200;
 const MAX_MESSAGES_PER_HOUSE = 500;
+
+// ملفات المراسلات (الإصدار 1.8): رسائل صوتية وصور بين الهاتفين
+// الحد الأقصى لكل ملف 6 ميجابايت بعد فك الترميز، و150 ملفاً لكل منزل
+// (عند التجاوز تُحذف الأقدم تلقائياً — الرسائل النصية تبقى كاملة)
+const MAX_FILE_BYTES = 6 * 1024 * 1024;
+const MAX_FILES_PER_HOUSE = 150;
+const VALID_MEDIA_TYPES = ['', 'IMAGE', 'AUDIO'];
 
 // رمز الربط: حروف إنجليزية وأرقام فقط، 4 إلى 32 محرفاً
 const CODE_RE = /^[A-Za-z0-9]{4,32}$/;
@@ -52,13 +61,43 @@ function persist() {
 }
 
 function getHouse(code) {
-  if (!store[code]) store[code] = { expenses: {}, templates: {}, messages: {}, settings: null };
+  if (!store[code]) store[code] = { expenses: {}, templates: {}, messages: {}, files: {}, settings: null };
   if (!store[code].expenses) store[code].expenses = {};
   // توافق خلفي: بيوت أُنشئت قبل إضافة القوالب
   if (!store[code].templates) store[code].templates = {};
   // توافق خلفي: بيوت أُنشئت قبل إضافة المراسلات (طلبات الشراء + الرسائل النصية)
   if (!store[code].messages) store[code].messages = {};
+  // توافق خلفي: بيوت أُنشئت قبل ملفات الوسائط (صوتيات وصور — الإصدار 1.8)
+  if (!store[code].files) store[code].files = {};
   return store[code];
+}
+
+// مجلد ملفات منزل معين (يُنشأ عند الحاجة)
+function houseFilesDir(code) {
+  const dir = path.join(FILES_DIR, code);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// حذف ملف وسائط من القرص ومن سجلات المنزل
+function deleteHouseFile(code, house, fileId) {
+  if (!fileId || !house.files[fileId]) return;
+  delete house.files[fileId];
+  try {
+    // الاسم على القرص مضمن مع رمز المنزل لتفادي أي تداخل بين المنازل
+    fs.unlinkSync(path.join(FILES_DIR, code, fileId.replace(/[^A-Za-z0-9_-]/g, '')));
+  } catch (e) {
+    // الملف غير موجود على القرص — تجاهل
+  }
+}
+
+// تقليم ملفات منزل: عند التجاوز نحذف الأقدم إنشاءً (السجلات + القرص)
+function pruneHouseFiles(code, house) {
+  const fids = Object.keys(house.files);
+  if (fids.length <= MAX_FILES_PER_HOUSE) return;
+  fids.sort((a, b) => (house.files[a].createdAt || 0) - (house.files[b].createdAt || 0));
+  const toRemove = fids.length - MAX_FILES_PER_HOUSE;
+  for (let i = 0; i < toRemove; i++) deleteHouseFile(code, house, fids[i]);
 }
 
 function isValidCode(code) {
@@ -67,7 +106,8 @@ function isValidCode(code) {
 
 // ---------- التطبيق ----------
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+// حد مرتفع لطلبات رفع ملفات الوسائط (صوت/صورة) بصيغة base64 داخل JSON
+app.use(express.json({ limit: '12mb' }));
 
 // السماح بكل المصادر (مفيد للاختبار من المتصفح؛ التطبيق لا يحتاج CORS)
 app.use((req, res, next) => {
@@ -258,6 +298,95 @@ app.post('/api/:code/messages', (req, res) => {
   res.json({ ok: true, messages: fresh, serverTime: Date.now() });
 });
 
+// ---------- ملفات الوسائط (الإصدار 1.8: رسائل صوتية وصور) ----------
+
+/**
+ * رفع ملف وسائط (صوت/صورة) بصيغة JSON: { name, mime, data(base64) }.
+ * نستخدم base64 داخل JSON بدل multipart لتبسيط عميل Retrofit، والحد
+ * الأقصى 6 ميجابايت بعد فك الترميز (الصوت المضغوط والصور المصغّرة
+ * من التطبيق أصغر من ذلك بكثير).
+ * يُرجع: { ok: true, id } — الـ id هو ما تشير إليه المراسلة (mediaFile).
+ */
+app.post('/api/:code/files', (req, res) => {
+  const code = req.params.code;
+  if (!isValidCode(code)) {
+    return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
+  }
+  const body = req.body || {};
+  const data = typeof body.data === 'string' ? body.data : '';
+  if (!data) {
+    return res.status(400).json({ ok: false, error: 'لا توجد بيانات الملف' });
+  }
+
+  let buf;
+  try {
+    buf = Buffer.from(data, 'base64');
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: 'بيانات الملف تالفة (base64)' });
+  }
+  if (!buf || buf.length === 0) {
+    return res.status(400).json({ ok: false, error: 'الملف فارغ' });
+  }
+  if (buf.length > MAX_FILE_BYTES) {
+    return res.status(413).json({ ok: false, error: 'الملف أكبر من الحد المسموح (6 ميغابايت)' });
+  }
+
+  const house = getHouse(code);
+  const id = crypto.randomUUID();
+  const safeId = id.replace(/[^A-Za-z0-9_-]/g, '');
+  try {
+    fs.writeFileSync(path.join(houseFilesDir(code), safeId), buf);
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'تعذر حفظ الملف على السيرفر' });
+  }
+
+  house.files[id] = {
+    id,
+    name: String(body.name || safeId).slice(0, 120),
+    mime: String(body.mime || 'application/octet-stream').slice(0, 60),
+    size: buf.length,
+    createdAt: Date.now()
+  };
+  pruneHouseFiles(code, house);
+  persist();
+  res.json({ ok: true, id, size: buf.length });
+});
+
+/** تحميل ملف وسائط بمحتواه الثنائي الصحيح (صورة/صوت) */
+app.get('/api/:code/files/:fileId', (req, res) => {
+  const code = req.params.code;
+  const fileId = String(req.params.fileId || '');
+  if (!isValidCode(code)) {
+    return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
+  }
+  const house = getHouse(code);
+  const meta = house.files[fileId];
+  if (!meta) {
+    return res.status(404).json({ ok: false, error: 'الملف غير موجود (قد يكون حُذف بالتقليم)' });
+  }
+  const safeId = fileId.replace(/[^A-Za-z0-9_-]/g, '');
+  const filePath = path.join(FILES_DIR, code, safeId);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok: false, error: 'الملف غير موجود على القرص' });
+  }
+  res.setHeader('Content-Type', meta.mime || 'application/octet-stream');
+  res.setHeader('Content-Length', meta.size || fs.statSync(filePath).size);
+  res.setHeader('Cache-Control', 'public, max-age=604800');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+/** حذف ملف وسائط واحد (يستخدمه التقليم المستقبلي أو إعادة الضبط اليدوية) */
+app.delete('/api/:code/files/:fileId', (req, res) => {
+  const code = req.params.code;
+  if (!isValidCode(code)) {
+    return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
+  }
+  const house = getHouse(code);
+  deleteHouseFile(code, house, String(req.params.fileId || ''));
+  persist();
+  res.json({ ok: true });
+});
+
 /**
  * دمج المراسلات بقاعدة "الأحدث يفوز" (مشترك بين /sync و /messages):
  *  - المقارنة صارمة (>) حتى لا يُعاد رفع نفس النسخة غير المتغيرة في كل مزامنة
@@ -280,6 +409,9 @@ function mergeMessages(house, rawList) {
       purchasedPrice: Number(raw.purchasedPrice) || 0,
       expenseId: String(raw.expenseId || '').slice(0, 64),
       senderId: String(raw.senderId || '').slice(0, 64),
+      // ملفات الوسائط (الإصدار 1.8): نوع الوسائط + معرّف الملف على السيرفر
+      mediaType: VALID_MEDIA_TYPES.includes(raw.mediaType) ? raw.mediaType : '',
+      mediaFile: String(raw.mediaFile || '').slice(0, 64),
       createdAt: Number(raw.createdAt) || 0,
       updatedAt: Number(raw.updatedAt) || 0,
       deleted: Boolean(raw.deleted)
@@ -313,6 +445,12 @@ app.delete('/api/:code', (req, res) => {
     return res.status(400).json({ ok: false, error: 'رمز الربط غير صالح' });
   }
   delete store[code];
+  // حذف ملفات الوسائط الخاصة بالمنزل من القرص أيضاً
+  try {
+    fs.rmSync(path.join(FILES_DIR, code), { recursive: true, force: true });
+  } catch (e) {
+    // لا يوجد مجلد ملفات — لا مشكلة
+  }
   persist();
   res.json({ ok: true });
 });

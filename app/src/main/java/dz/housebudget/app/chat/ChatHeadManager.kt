@@ -21,6 +21,7 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import dz.housebudget.app.R
 import dz.housebudget.app.data.HouseMessage
+import dz.housebudget.app.data.MessageMedia
 import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.databinding.ViewChatBubbleBinding
@@ -179,8 +180,20 @@ object ChatHeadManager {
     fun onMessagesChanged(messages: List<HouseMessage>) {
         onMain {
             latestMessages = messages
-            if (expanded) renderPanel() else updateBadge()
+            if (expanded) {
+                renderPanel()
+                // اللوحة مفتوحة: مرفقات الوسائط (صور/صوتيات) تُحمّل تلقائياً
+                ensureMediaDownloads(messages)
+            } else updateBadge()
             refreshVisibility()
+        }
+    }
+
+    /** تحميل مرفقات الوسائط الظاهرة في لوحة الفقاعة (مثل شاشة المراسلات) */
+    private fun ensureMediaDownloads(messages: List<HouseMessage>) {
+        for (m in messages) {
+            if (m.deleted || m.mediaType == MessageMedia.NONE || m.mediaFile.isBlank()) continue
+            scope.launch { BudgetRepository.ensureMediaDownloaded(m) }
         }
     }
 

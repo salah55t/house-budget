@@ -17,6 +17,7 @@ import dz.housebudget.app.MainActivity
 import dz.housebudget.app.R
 import dz.housebudget.app.data.AppDatabase
 import dz.housebudget.app.chat.ChatHeadManager
+import dz.housebudget.app.data.MessageMedia
 import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.repo.BudgetRepository
@@ -283,7 +284,14 @@ class SyncForegroundService : Service() {
             Kind.NEW_MESSAGE -> Triple(
                 CHANNEL_MESSAGES,
                 getString(R.string.notif_new_message_title),
-                message.text
+                // رسائل الوسائط (الإصدار 1.8): وصف واضح بدل نص فارغ
+                when (message.mediaType) {
+                    MessageMedia.IMAGE ->
+                        if (message.text.isNotBlank()) message.text
+                        else getString(R.string.notif_media_image)
+                    MessageMedia.AUDIO -> getString(R.string.notif_media_audio)
+                    else -> message.text
+                }
             )
             Kind.NEW_REQUEST -> {
                 val extra = if (message.suggestedPrice > 0) {

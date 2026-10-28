@@ -125,6 +125,22 @@
     <string name="send">إرسال</string>
     <string name="sync_failed_short">تعذرت المزامنة — سيُعاد الإرسال تلقائياً خلال ثوانٍ</string>
 
+    <!-- الرسائل الصوتية والصور في المراسلات (الإصدار 1.8): مثل واتساب -->
+    <string name="media_record_audio">تسجيل رسالة صوتية</string>
+    <string name="media_pick_image">إرفاق صورة من المعرض</string>
+    <string name="media_image_desc">صورة مرفقة</string>
+    <string name="media_audio_desc">تشغيل/إيقاف الرسالة الصوتية</string>
+    <string name="media_downloading">جاري التنزيل…</string>
+    <string name="media_sent">تم إرسال المرفق إلى الهاتف الآخر</string>
+    <string name="media_send_failed">تعذر إرسال المرفق — تحقق من الإنترنت ورمز الربط ثم أعد المحاولة</string>
+    <string name="media_record_failed">تعذر بدء التسجيل — تأكد أن تطبيقاً آخر لا يستخدم المايك</string>
+    <string name="media_recording_cancelled">أُلغي التسجيل</string>
+    <string name="media_cancel_recording">إلغاء التسجيل</string>
+    <string name="media_mic_permission_denied">بدون إذن المايك لا يمكن تسجيل رسائل صوتية — امنح الإذن من الإعدادات أو أرسل رسالة نصية</string>
+    <string name="recording_hint">جاري التسجيل… اضغط زر الإيقاف لإرسال الرسالة الصوتية</string>
+    <string name="notif_media_image">صورة مرفقة</string>
+    <string name="notif_media_audio">رسالة صوتية</string>
+
     <!-- الإشعارات الفورية (الإصدار 1.5): مثل واتساب حتى والتطبيق مغلق -->
     <string name="settings_notif_section">الإشعارات الفورية</string>
     <string name="switch_notif">إشعارات الرسائل وطلبات الشراء (مثل واتساب)</string>

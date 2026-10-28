@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    فقاعة رسالة نصية في المحادثة:
-    الاتجاه والخلفية واللون يُضبطان برمجياً (مني: خضراء بمحاذاة النهاية /
-    من الهاتف الآخر: بيضاء بمحاذاة البداية) بما يناسب الاتجاه RTL.
+    فقاعة مراسلة في المحادثة (الإصدار 1.8 — ثلاثة أشكال):
+    1) نصية: نص + وقت (كما كانت)
+    2) صورة: صورة مضغوطة + تعليق اختياري + وقت (نقرة تعرضها بحجم كامل)
+    3) صوتية: زر تشغيل/إيقاف + شريط تقدم + مدة + وقت (مثل واتساب)
+    الاتجاه والخلفية واللون يُضبطان برمجياً حسب المرسل وبما يناسب RTL.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -16,11 +18,71 @@
         android:background="@drawable/bg_bubble_theirs"
         android:maxWidth="300dp"
         android:orientation="vertical"
-        android:paddingStart="12dp"
+        android:paddingStart="10dp"
         android:paddingTop="8dp"
-        android:paddingEnd="12dp"
+        android:paddingEnd="10dp"
         android:paddingBottom="8dp">
 
+        <!-- الصورة المرفقة (تظهر للرسائل الصورية فقط) -->
+        <ImageView
+            android:id="@+id/imgMedia"
+            android:layout_width="230dp"
+            android:layout_height="200dp"
+            android:layout_marginBottom="4dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/media_image_desc"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <!-- مشغّل الرسالة الصوتية (يظهر للرسائل الصوتية فقط) -->
+        <LinearLayout
+            android:id="@+id/audioRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/btnPlay"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_chat_head">
+
+                <ImageView
+                    android:id="@+id/imgPlayState"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clickable="false"
+                    android:contentDescription="@string/media_audio_desc"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_play"
+                    android:tint="@color/white" />
+            </FrameLayout>
+
+            <SeekBar
+                android:id="@+id/seekAudio"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
+                android:max="1000"
+                android:progressBackgroundTint="@color/text_secondary"
+                android:progressTint="@color/green_primary"
+                android:thumbTint="@color/green_primary" />
+
+            <TextView
+                android:id="@+id/txtAudioDuration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="38dp"
+                android:text="0:00"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- النص (الرسائل النصية) أو تعليق الصورة أو حالة التنزيل -->
         <TextView
             android:id="@+id/txtText"
             android:layout_width="wrap_content"

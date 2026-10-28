@@ -6,6 +6,7 @@ import dz.housebudget.app.data.AppSettings
 import dz.housebudget.app.data.Categories
 import dz.housebudget.app.data.Expense
 import dz.housebudget.app.data.HouseMessage
+import dz.housebudget.app.data.MessageMedia
 import dz.housebudget.app.data.MessageStatus
 import dz.housebudget.app.data.MessageTypes
 import dz.housebudget.app.data.QuickTemplate
@@ -19,6 +20,7 @@ import dz.housebudget.app.sync.SyncRequest
 import dz.housebudget.app.sync.SyncResponse
 import dz.housebudget.app.sync.TemplateDto
 import dz.housebudget.app.util.BudgetLogic
+import dz.housebudget.app.util.MediaCache
 import dz.housebudget.app.util.PeriodInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -64,6 +66,14 @@ object BudgetRepository {
 
     /** معرف هذا الجهاز لتمييز اتجاه المراسلة (مني / من الهاتف الآخر) */
     fun myDeviceId(): String = deviceId
+
+    // رمز المنزل المخزّن مؤقتاً: للوصول السريع من محولات القوائم
+    // (ChatAdapter) دون استعلام قاعدة بيانات من الخيط الرئيسي
+    @Volatile
+    private var cachedHouseCode: String = ""
+
+    /** آخر رمز منزل عُرف للمستودع (قد يكون فارغاً قبل أول مزامنة) */
+    fun cachedHouseCode(): String = cachedHouseCode
 
     // ---------- التدفقات الحية (تحدّث الواجهة تلقائياً عند أي تغيير) ----------
     // ملاحظة: نستخدم خصائص get() وليس قيماً مخزنة، حتى تُبنى بعد تهيئة db
@@ -191,6 +201,54 @@ object BudgetRepository {
     }
 
     /**
+     * إرسال رسالة وسائط (الإصدار 1.8): رسالة صوتية أو صورة مرفوعة
+     * مسبقاً إلى السيرفر — mediaFile هو معرّف الملف الذي أُرجعه السيرفر،
+     * وtext تعليق نصي اختياري (للصورة).
+     */
+    suspend fun sendMediaMessage(
+        mediaType: String,
+        mediaFile: String,
+        caption: String = "",
+        now: Long = System.currentTimeMillis()
+    ) {
+        if (mediaFile.isBlank()) return
+        val message = HouseMessage(
+            type = MessageTypes.TEXT,
+            text = caption.trim(),
+            mediaType = mediaType,
+            mediaFile = mediaFile,
+            senderId = deviceId,
+            createdAt = now,
+            updatedAt = now
+        )
+        db.messageDao().upsert(message)
+        dirtyMessageIds.add(message.id)
+        // رسالتي أنا لا تُشعرني — لكنها ستُشعر الهاتف الآخر
+        SyncForegroundService.acknowledgeMessage(appContext, message.id, now)
+    }
+
+    /**
+     * ضمان جاهزية مرفق وسائط للعرض: يُحمّل الملف من السيرفر مرة واحدة
+     * إن لم يكن محمّلاً محلياً (تُستدعى من شاشة المراسلات ولوحة الفقاعة
+     * عند ظهور رسالة صوتية أو صورة في القائمة).
+     * عند نجاح التحميل يُعاد ختم المراسلة في القاعدة ليتحدث التدفق الحي
+     * فتظهر الصورة/الصوت فور جاهزيته.
+     */
+    suspend fun ensureMediaDownloaded(message: HouseMessage): Boolean {
+        if (message.mediaType == MessageMedia.NONE || message.mediaFile.isBlank()) return true
+        val settings = settingsSnapshot()
+        if (settings.houseCode.isBlank() || settings.serverUrl.isBlank()) return false
+        if (MediaCache.isDownloaded(appContext, settings.houseCode, message)) return true
+
+        val ok = MediaCache.download(appContext, settings.houseCode, settings.serverUrl, message)
+        if (ok) {
+            // إعادة كتابة نفس السجل لتشغيل تدفق Room الحي (الواجهة تعيد الرسم)
+            db.messageDao().upsert(message)
+        }
+        return ok
+    }
+
+    /**
      * تأكيد شراء طلب من قائمة الانتظار:
      * يُنشأ مصروف بالثمن الفعلي فيُخصم تلقائياً من الميزانية (المتبقي مشتق)،
      * وتتغير حالة الطلب إلى "تم الشراء" فتنتقل للهاتف الآخر عند المزامنة.
@@ -239,7 +297,11 @@ object BudgetRepository {
     }
 
     /** لقطة سريعة من الإعدادات الحالية */
-    suspend fun settingsSnapshot(): AppSettings = db.settingsDao().get() ?: AppSettings()
+    suspend fun settingsSnapshot(): AppSettings {
+        val s = db.settingsDao().get() ?: AppSettings()
+        cachedHouseCode = s.houseCode
+        return s
+    }
 
     /** حساب الدورة الحالية من الإعدادات المحفوظة */
     suspend fun currentPeriod(): PeriodInfo = BudgetLogic.currentPeriod(settingsSnapshot())
@@ -450,11 +512,13 @@ object BudgetRepository {
     private fun HouseMessage.toDto() =
         MessageDto(
             id, type, text, suggestedPrice, status,
-            purchasedPrice, expenseId, senderId, createdAt, updatedAt, deleted
+            purchasedPrice, expenseId, senderId,
+            mediaType, mediaFile, createdAt, updatedAt, deleted
         )
     private fun MessageDto.toEntity() =
         HouseMessage(
             id, type, text, suggestedPrice, status,
-            purchasedPrice, expenseId, senderId, createdAt, updatedAt, deleted
+            purchasedPrice, expenseId, senderId,
+            mediaType, mediaFile, createdAt, updatedAt, deleted
         )
 }

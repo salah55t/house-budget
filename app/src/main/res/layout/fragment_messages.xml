@@ -174,7 +174,56 @@
                     android:textSize="13sp" />
             </LinearLayout>
 
-            <!-- صف الإدخال: حقل الرسالة + زر الإرسال -->
+            <!-- شريط التسجيل الجاري (يظهر فقط أثناء تسجيل رسالة صوتية) -->
+            <LinearLayout
+                android:id="@+id/recBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_chat_input"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="8dp"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:background="@drawable/bg_rec_dot" />
+
+                <TextView
+                    android:id="@+id/txtRecTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="0:00"
+                    android:textColor="@color/text_main"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:text="@string/recording_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <ImageButton
+                    android:id="@+id/btnRecCancel"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/media_cancel_recording"
+                    android:src="@drawable/ic_close"
+                    app:tint="@color/text_secondary" />
+            </LinearLayout>
+
+            <!-- صف الإدخال: حقل الرسالة + زر الصورة + زر المايك + زر الإرسال -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -198,11 +247,37 @@
                         android:maxLines="4" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- إرفاق صورة من المعرض -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:contentDescription="@string/media_pick_image"
+                    android:src="@drawable/ic_image"
+                    app:backgroundTint="@color/green_light"
+                    app:fabSize="mini"
+                    app:tint="@color/white" />
+
+                <!-- تسجيل رسالة صوتية (اضغط للبدء ثم للإيقاف والإرسال) -->
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/btnMic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:contentDescription="@string/media_record_audio"
+                    android:src="@drawable/ic_mic"
+                    app:backgroundTint="@color/green_primary"
+                    app:fabSize="mini"
+                    app:tint="@color/white" />
+
                 <com.google.android.material.floatingactionbutton.FloatingActionButton
                     android:id="@+id/btnSend"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="6dp"
                     android:layout_marginBottom="4dp"
                     android:contentDescription="@string/send"
                     android:src="@drawable/ic_send"

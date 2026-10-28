@@ -14,8 +14,8 @@ android {
         // الحد الأدنى: أندرويد 10 (API 29) كما هو مطلوب
         minSdk = 29
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
 
     buildTypes {
@@ -70,4 +70,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // قراءة دوران صور الكاميرا (EXIF) قبل ضغط الصور المرفقة في المراسلات
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }

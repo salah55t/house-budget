@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- تسجيل الرسائل الصوتية في المراسلات (الإصدار 1.8): صلاحية زمنية
+         تُطلب عند أول ضغط على زر المايك — ولا تُستخدم إلا للتسجيل داخل التطبيق -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- الفقاعة العائمة مثل ماسنجر: تظهر فوق التطبيقات الأخرى عند وصول رسالة
          (إذن يُمنح يدوياً من زر مخصص في الإعدادات — وبدونه تعمل الفقاعة داخل التطبيق) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />

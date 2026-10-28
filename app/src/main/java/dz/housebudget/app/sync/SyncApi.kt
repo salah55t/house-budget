@@ -34,6 +34,17 @@ interface SyncApi {
     @GET("api/{code}/state")
     suspend fun pullState(@Path("code") code: String): SyncResponse
 
+    // رفع ملف وسائط (رسالة صوتية أو صورة — الإصدار 1.8) بصيغة base64
+    @POST("api/{code}/files")
+    suspend fun uploadFile(@Path("code") code: String, @Body body: FileUploadRequest): FileUploadResponse
+
+    // تحميل ملف وسائط بمحتواه الثنائي (يُقرأ عبر OkHttp مباشرة)
+    @GET("api/{code}/files/{fileId}")
+    suspend fun downloadFile(
+        @Path("code") code: String,
+        @Path("fileId") fileId: String
+    ): okhttp3.ResponseBody
+
     // فحص وجود السيرفر وصحة الرمز
     @GET("api/{code}/ping")
     suspend fun ping(@Path("code") code: String): PingResponse
@@ -49,7 +60,8 @@ object ApiClient {
         val client = OkHttpClient.Builder()
             .addInterceptor(logging)
             .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            // ملفات الوسائط (صوت/صورة) قد تحتاج وقتاً أطول قليلاً من النص
+            .readTimeout(45, TimeUnit.SECONDS)
             .build()
 
         return Retrofit.Builder()
